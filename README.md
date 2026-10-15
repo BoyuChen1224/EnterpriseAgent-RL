@@ -89,9 +89,9 @@ python examples/api_client.py
 
 ```bash
 # 仅在后续获准的 Slurm 计算节点作业内，已有模型端点启动后：
-earl --config configs/agent/cpu.toml evaluate --policy local   --endpoint http://127.0.0.1:8001/v1/chat/completions   --model Qwen2.5-1.5B-Instruct --policy-version qwen-base-r1   --split test --output artifacts/qwen-base-r1
+earl --config configs/agent/qwen.toml evaluate --policy local   --endpoint http://127.0.0.1:8001/v1/chat/completions   --model Qwen/Qwen2.5-1.5B-Instruct --policy-version qwen-base-r1   --split test --output artifacts/qwen-base-r1
 # 或把该版本注册到 Agent API：
-earl serve --local-endpoint http://127.0.0.1:8001/v1/chat/completions   --model Qwen2.5-1.5B-Instruct --policy-version qwen-base-r1
+earl --config configs/agent/qwen.toml serve --local-endpoint http://127.0.0.1:8001/v1/chat/completions   --model Qwen/Qwen2.5-1.5B-Instruct --policy-version qwen-base-r1
 ```
 
 模型服务端已实现 Transformers FP16/eager 路径；显存、速度及真实模型兼容性仍待授权 GPU 实测，不能把客户端协议测试解释为模型兼容性通过。没有安装 vLLM、FlashAttention、TRL 或 verl。依赖选择依据及真实上游源码版本见 [上游调研](docs/upstream-research.md)。

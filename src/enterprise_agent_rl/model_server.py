@@ -109,6 +109,7 @@ class QwenEngine:
             "cuda_runtime": torch.version.cuda,
             "effective_dtype": str(next(self.model.parameters()).dtype),
             "effective_attention": self.model.config._attn_implementation,
+            "checkpoint_generation_config": self.model.generation_config.to_dict(),
             "gpu_name": torch.cuda.get_device_name(0),
             "compute_capability": capability,
             "architectures": torch.cuda.get_arch_list(),

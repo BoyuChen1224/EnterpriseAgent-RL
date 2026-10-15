@@ -34,6 +34,7 @@ def evaluate_suite(
             "schema_version": "1.1",
             "split": split,
             "manifest_sha256": frozen["manifest_sha256"],
+            "database_fingerprint_kind": frozen["database_fingerprint_kind"],
             "policy_kind": policy.kind,
             "policy_version": policy.version,
             "settings": settings.model_dump(),

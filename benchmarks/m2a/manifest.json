@@ -1,10 +1,11 @@
 {
+  "database_fingerprint_kind": "sha256-canonical-schema-and-rows-v1",
   "version": "m2a-synthetic-v1",
   "databases": [
     {
       "id": "train-0",
       "split": "train",
-      "sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "seed": 101,
       "year": 2021,
       "database_version": "m2a-synthetic-v1"
@@ -12,7 +13,7 @@
     {
       "id": "train-1",
       "split": "train",
-      "sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "seed": 102,
       "year": 2021,
       "database_version": "m2a-synthetic-v1"
@@ -20,7 +21,7 @@
     {
       "id": "validation-0",
       "split": "validation",
-      "sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "seed": 201,
       "year": 2023,
       "database_version": "m2a-synthetic-v1"
@@ -28,7 +29,7 @@
     {
       "id": "validation-1",
       "split": "validation",
-      "sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "seed": 202,
       "year": 2023,
       "database_version": "m2a-synthetic-v1"
@@ -36,7 +37,7 @@
     {
       "id": "test-0",
       "split": "test",
-      "sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "seed": 301,
       "year": 2025,
       "database_version": "m2a-synthetic-v1"
@@ -44,7 +45,7 @@
     {
       "id": "test-1",
       "split": "test",
-      "sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "seed": 302,
       "year": 2025,
       "database_version": "m2a-synthetic-v1"
@@ -67,12 +68,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "schema",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "8bd977881fce205fb3da81e87cb8de827decf7657c8efcec9e89ccbdfeb007b1",
-      "data_fingerprint": "327cb6328d23d7a47887960b0e85608df95143bbe5e1b36ba9a9368317190906"
+      "data_fingerprint": "7dfc64cb3a486d53dffdb17dd33aaeed2d5d8d872bb31c183d5014a958728acb"
     },
     {
       "task": {
@@ -90,12 +91,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "region",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "eaa51c2a338e638988a7d66408bf3e80991ff62d0ae9b9fe8cda54e96689d6be",
-      "data_fingerprint": "4397027d93a21ec5f6cc8d633c690f3149f8910b1fef5b5c397011e256572d20"
+      "data_fingerprint": "098ca76ef437d26e35ae9e4da67fb2d8db9286da85371e2eb1c22dba1b328339"
     },
     {
       "task": {
@@ -113,12 +114,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "top",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "f5e8edffd2e5299f7b12548e361259ecb8acbf94ccb02e270452f12348414b37",
-      "data_fingerprint": "5989610e27038b4c03af9895f953087c0f5834226a2199c98727ec40686c7b7a"
+      "data_fingerprint": "13edb7eb941a5a9ce3221b00d5fea2d4881d913f5bcc101cf5c95eb6b9948664"
     },
     {
       "task": {
@@ -136,12 +137,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "customer",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "f2e903ab38704394ccec22fee0db51affff93d9e056047dab6ccb84773a0dcbf",
-      "data_fingerprint": "8fb1b100b44dfdf8c354195aed79430f64ede7019ab2e1a7ff9863c1892af92d"
+      "data_fingerprint": "7169b6ef4b50b87f2936de2374ccfefbb22fe65cf3bd9a535bdbca5161a55af1"
     },
     {
       "task": {
@@ -159,12 +160,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "product",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "961ddf4a159914f50ac80f3e03afea2326612b2f94e154150b7b3a11636e7911",
-      "data_fingerprint": "7e756afd217f18ab9e9e63856b8db499d69c434bd0cb7aa1b141724d56fd5e2c"
+      "data_fingerprint": "48af87c400b97cb95afa01b9163a79faf1d8a9ec88c4bd2ee1350ed79e7fe16d"
     },
     {
       "task": {
@@ -182,12 +183,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "empty",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "5b7536e1961fe30b45a65a2851ee5e351d3b0a5cca1b6e63163c1dc61d95c81c",
-      "data_fingerprint": "833602f4234aae5fba42ae614cf980572c016df131d6eadcb5306b7be0a7bff4"
+      "data_fingerprint": "0e988ed8308e2ff4b796694700fdb0ae693414619bc3a03e957b8a88670ceea9"
     },
     {
       "task": {
@@ -205,12 +206,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "constraints",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "2278856e8c897cf36058362194e02441e088965c42f796d4e4fa7b6328a658d1",
-      "data_fingerprint": "2a3c78896a4801ea090bddb85a5e923f45d191f9ccaa2689beaef95b8515a31a"
+      "data_fingerprint": "cce185787343e8aca8181cf1e75453139c154f66281c5cac8c7e003f6595adf1"
     },
     {
       "task": {
@@ -228,12 +229,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "recovery",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "3b5f05b2fe263a434cec4f8198d64a7d1b3183bd97bc266c2bf7fb9282f884f8",
-      "data_fingerprint": "b19383ca4e7e2353f59b61d17d124ce986b2b1140a7fbdf7b3d99309020cddda"
+      "data_fingerprint": "1b82a1746c14e213a08c957b3be13a1313c80056de9fa01631ab6200bcb5ec25"
     },
     {
       "task": {
@@ -251,12 +252,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "category",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "3fb308b1496d1053a0a88fc93319c347210516c7a7e63b0723aaa76461da2c2e",
-      "data_fingerprint": "4abaa89316492f15ec5ddceeb8e21a1c8d5ba6ae4996edb87735e2c914f03307"
+      "data_fingerprint": "b1bb361055b887a0d59244697934c5ad6fcbd9760fe4cc9a19f09645979d8aa8"
     },
     {
       "task": {
@@ -274,12 +275,12 @@
       },
       "database_id": "train-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6e35b9a64432501df71aa90b787c57ad0dc742e9a52e506285d83651885d91cc",
+      "database_sha256": "90b5d80a19d26f5df0ffe367a10f8cfd947694c0bfc7e8f25be01fc4c6fc879d",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "inactive",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "37ad5ba473a6eb585fa9e5b3f6ad54b9507c9bc753d633d95bfca9ba69b9a7d7",
-      "data_fingerprint": "c75546bf84d41efdfbb9bc3c75513a034032bee516c83bb3c4f0d42659425bd3"
+      "data_fingerprint": "9429b90f8f977e05d56fad9a5ecd7ee52cde20dc02fa299362cdfadb0608ddcd"
     },
     {
       "task": {
@@ -297,12 +298,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "schema",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "c6c1b4d345b53a17f16d49c4af814be6b5287715960b1b2a642e47eedd93e72a",
-      "data_fingerprint": "e293dd59b6a835dca81a1ffb42d74e606bba72e3d94ee88000e215de808dd6b3"
+      "data_fingerprint": "fc386b82a158d14597e74a2891ef6a8ae6eeb3f03e24e95fcdc26659de80178b"
     },
     {
       "task": {
@@ -320,12 +321,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "region",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "78b86d193571e948c3a939d5ae9b5d05c7261546b930dd371a2da5f2e20cccee",
-      "data_fingerprint": "afa2663f5ac0bc43fcc68e60be89b195c4ce34e9f3de9fec7f10ec9e98d5c2f4"
+      "data_fingerprint": "7087b9e5b3bdd4c7908b8fe027e224df63859342d9f509e4e9d1baff8aa45180"
     },
     {
       "task": {
@@ -343,12 +344,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "top",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "66c2dcfcbae0f2e63c565d5696265d8a7a43103bb2e34ccad1e2814f84eada2e",
-      "data_fingerprint": "5595b2513dba173f58e7c1e3421dcf95b34fe7195e73c56232e9b67198e37a0c"
+      "data_fingerprint": "1df1b621bb7076fcaede89ba32f44aeebd11d4a13d6f2b0d9635a58749041015"
     },
     {
       "task": {
@@ -366,12 +367,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "customer",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "9ba819eee23daaa4195b9b25f64fd3cbad67649215aa6fb65e8bdf6bde776ff1",
-      "data_fingerprint": "1976381320e6a7de32cc1e1b3a349e14ea1cfa7e4d540c9c43b6b81845620a01"
+      "data_fingerprint": "c43634e48ad468fd98abdd0ad80278f6cce788824e3d488b7b6022e0cc1133ac"
     },
     {
       "task": {
@@ -389,12 +390,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "product",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "374b20a26e5477eec9e7fd7d75229b537b21d25f2e952dd3708bb639e6759cbd",
-      "data_fingerprint": "38fe4695e9ab750d042c95aa1540048766ec42fcffeeb05ab3dc06a8c4744dde"
+      "data_fingerprint": "37c902f6d7b09686315ee0592eb1c8d9c64a7d9590fb38d55d2a8c5dd7f0a0e2"
     },
     {
       "task": {
@@ -412,12 +413,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "empty",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "5b7536e1961fe30b45a65a2851ee5e351d3b0a5cca1b6e63163c1dc61d95c81c",
-      "data_fingerprint": "8ec63c6d066e384d90bd53db71dc27cadeb0066b30808b8b592f11c26c9d9399"
+      "data_fingerprint": "84286e25c84c2877d6f191c67d45ea34f35253d14c960bbed46d712b4a3723ab"
     },
     {
       "task": {
@@ -435,12 +436,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "constraints",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "573038950bd891fb851a0f01ac0e3a7b58e84182e50478185eb3c29b2c8bd767",
-      "data_fingerprint": "5c8a2130ec58f3a2010b9ffe4c2afb600dfa071656aac6f4ce4af5297a913e4b"
+      "data_fingerprint": "76abf7714d189f76d98b72e6da02a5db17aab599ff965984aaab014ac1be3a1d"
     },
     {
       "task": {
@@ -458,12 +459,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "recovery",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "3b5f05b2fe263a434cec4f8198d64a7d1b3183bd97bc266c2bf7fb9282f884f8",
-      "data_fingerprint": "a74f322a4cca4eb850e6440c93f5959b2b87d08a5d107fa5eca1b9bc01bb4db6"
+      "data_fingerprint": "9a8abf3532aa569cda6b4e241c2515de04968102e0bed068ec5ba8c6300119c1"
     },
     {
       "task": {
@@ -481,12 +482,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "category",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "e7133edcecb69ff8758aa7579c717f467b7f6c0196faa3cc3c205c3b9cd208d9",
-      "data_fingerprint": "25d82427291a39e8edad6fb8bd9dbd247939b94f24c2f54403529060a233e6f9"
+      "data_fingerprint": "88a67538c11304d7ac0254699d922a5355c7aade7b83b026c742abe76024ee75"
     },
     {
       "task": {
@@ -504,12 +505,12 @@
       },
       "database_id": "train-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf",
+      "database_sha256": "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "inactive",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "b14b5f594807f0ef1a9f2961948e152a8bd3654e517e44a866bd5f732a4348a0",
-      "data_fingerprint": "36c0e21771f27af0ae6e35bfc871a4f563bdf77a291e8face0935d89b2edaa86"
+      "data_fingerprint": "bf8fd6970de342dba54f328ae07e528df762fd79023f78f76f437eb30d3bcbc7"
     },
     {
       "task": {
@@ -527,12 +528,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "schema",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "36fab371e8b9a984c878e4ff23cdba7c2dedfc9979142e168def6575deed58c1",
-      "data_fingerprint": "f7e66b68e2ca907420a03227f3ff582af18375faf18cbecfa72eb9d43350ac04"
+      "data_fingerprint": "6e92eb217e5e21790ea54b61a62a43f7b122df96e264782177c8f7ca85e485a7"
     },
     {
       "task": {
@@ -550,12 +551,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "region",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "5a94617429df136de211a201c59f4d400a4f75b9ca0f277299d87d00531b9d3c",
-      "data_fingerprint": "4c372ec8c14a47c77609e77495ea6f643ac375ca162110aae0919f74014b3b23"
+      "data_fingerprint": "7622a8d163b0308aab566833b5253fcee639ce4a42a5f35565a9953d2875397a"
     },
     {
       "task": {
@@ -573,12 +574,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "top",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "5ac6fe790db8487c22f9da6f2041b1a5b5378188ba408a96593361960c1bf95b",
-      "data_fingerprint": "12e169a117eecb431cfcd6040d193bf540d33f2bc1a38094b637f7481a0d48b2"
+      "data_fingerprint": "4145ef7d59d22044fbf1b47117b8bce2d3ba0714cbc917af1a0ff7a2417e3a96"
     },
     {
       "task": {
@@ -596,12 +597,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "customer",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "ebce0398cfa6e6dc76bcb0c4d69f36a7b5190da2d4b17180cbd0a9be9f3d11cf",
-      "data_fingerprint": "829882b299a87674e31fe5c343ec679034b47c09df73af881838cb31ccc66e57"
+      "data_fingerprint": "2cdc013c90e87bbf045bdd181ec99a60b474266b285791d11c44bf65dd7b69c7"
     },
     {
       "task": {
@@ -619,12 +620,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "product",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "18f232e470e53aa71e021037acff7aea7d254536949591b76cbbd2431befd84e",
-      "data_fingerprint": "b08cc59498f6663b6c6d2d87d64dd5f3fe632e0134867bc879879819079ca7f8"
+      "data_fingerprint": "c7cb107f572bdd348f820dc2354d5955257a4330964c61928e5fd96c3d696fbb"
     },
     {
       "task": {
@@ -642,12 +643,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "empty",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "5b7536e1961fe30b45a65a2851ee5e351d3b0a5cca1b6e63163c1dc61d95c81c",
-      "data_fingerprint": "52ef67328f4b801294b5409d5e236a5f54a293173ebad0a2a00c94f2389d3639"
+      "data_fingerprint": "0a17e2c0f03b588a0d05a16aa451e079daa4c0b4576b43d7a478797148155ade"
     },
     {
       "task": {
@@ -665,12 +666,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "constraints",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "c7891c12d1e8d9d282ec1e80f1105297d6e7e191b24f704b82298f2e1a2613b8",
-      "data_fingerprint": "e1ae65906acf2baae90067e5540021c54d8d29353f7d8e30e6e8f28891a75f83"
+      "data_fingerprint": "48fa564f97ede40911baf537777c4404a77bc567f7fea94e5750c5a7915d873a"
     },
     {
       "task": {
@@ -688,12 +689,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "recovery",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "3b5f05b2fe263a434cec4f8198d64a7d1b3183bd97bc266c2bf7fb9282f884f8",
-      "data_fingerprint": "5c041925e01891076f4381dcb98ead12e3d3077edc2a8b2344c10a9273cdafdf"
+      "data_fingerprint": "4a35264f32f629e10a33edea7dd584bf01c6a72ff04af1280dae0fd969b59049"
     },
     {
       "task": {
@@ -711,12 +712,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "status",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "8f0057c9da8de42d99d660e9c0064bf2d78b3c457150b1383ebbb7c7fa216e38",
-      "data_fingerprint": "03624e2d47ab742b1137b63ca9bc9ebe8b0631546476c4cb3cc94a0ebd1112eb"
+      "data_fingerprint": "d6cfaff1c8b947e67d4cce4087908e8324b155065adf453d117c02f115391c7b"
     },
     {
       "task": {
@@ -734,12 +735,12 @@
       },
       "database_id": "validation-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53",
+      "database_sha256": "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "monthly",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "9985a149b133ea69e2495e1b38baafe506630da64d45c8492d119da54f955421",
-      "data_fingerprint": "aab5283417bbe41305d393d6cee40b63fd0d3c970a80cf298fc0e726ddfab5a2"
+      "data_fingerprint": "db19df829b693c2c38f4f08afd0c60eaf6fffa360bf4b837c6ac833695f3f59e"
     },
     {
       "task": {
@@ -757,12 +758,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "schema",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "8dcb2861fd28cd65800a1470cd9d0239c622c30ba0e4249a9428b0efde46d508",
-      "data_fingerprint": "4ed6d31600e29de73ea6ceef4a7b9595d337aebfe796bdf8e845e1682190b3c5"
+      "data_fingerprint": "bdc16dd459aae3b42a4faebb4983a055d48b63ac3f45436461c0b0592b6faa9f"
     },
     {
       "task": {
@@ -780,12 +781,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "region",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "012477c03fbeebfdca53256ed9d4fc52e5330e7757ee61972c8f73a23b56e046",
-      "data_fingerprint": "340b31ea00d6eae3f9f1d01ebc65a24900adb87ba93abc898a358916fada549c"
+      "data_fingerprint": "b5b2d57431913d489aa05e7eb0cd850c167cb69b9bd22f283052bc2366e052c9"
     },
     {
       "task": {
@@ -803,12 +804,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "top",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "b3ba1901b632c39944cbc291068d82d5cc39a488ced3d83610baa0f2cce93c1f",
-      "data_fingerprint": "0315f1c734b53c7028c67e586d1bbdd0c558ced1f0ca930f6448723745f7de7a"
+      "data_fingerprint": "d601d6534827c3e8ea9e067835196d680a0b47ef53265b6a68098fd106a5ca6f"
     },
     {
       "task": {
@@ -826,12 +827,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "customer",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "855872cc379ce0df0382614b2cd0c58e60ad646b509e93e11bbae4fd0f5ffb1a",
-      "data_fingerprint": "8084d4f21832b790facf8c626adbfa2d38d7b63db43b705112b85c2ad2181779"
+      "data_fingerprint": "7a94c304f6b4fd58f65a505d60c4d5ac45f34f6a404f06c5ad0d14e4ae3e9df3"
     },
     {
       "task": {
@@ -849,12 +850,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "product",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "b3cc14a1e3017d894caabc205d1a1e3992a409739fbeeeab8ccd4efe423abde4",
-      "data_fingerprint": "f0193aef4ad1d1eb970436682a6d9f47610b3ac9935d79243ea93d82b11f484a"
+      "data_fingerprint": "6602882a33ec189d22c8e9b5e7feb84dc4bdcd5bae6362b017ccf41ffeb9b709"
     },
     {
       "task": {
@@ -872,12 +873,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "empty",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "5b7536e1961fe30b45a65a2851ee5e351d3b0a5cca1b6e63163c1dc61d95c81c",
-      "data_fingerprint": "e29383e72c7604fae364623cd639ebcd435ae82bcd03f26ecdfe57e2cac320f9"
+      "data_fingerprint": "e987d298152c57b08a2dec9c0c6c8ced329b46a72027581475d320b82044afbd"
     },
     {
       "task": {
@@ -895,12 +896,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "constraints",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "88bfd0a88318ee57b60e506e925483026dc007cd526bf4b6dd45bf7b345c5d44",
-      "data_fingerprint": "61c328252c6e29bbeb1bff6801cfebe0ddef5eb732782ea050289cae5dc8ecfc"
+      "data_fingerprint": "17245c341f14c8da67f9116a2fc9ded78d995dd3b98373933e6f9c4ffb476eeb"
     },
     {
       "task": {
@@ -918,12 +919,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "recovery",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "3b5f05b2fe263a434cec4f8198d64a7d1b3183bd97bc266c2bf7fb9282f884f8",
-      "data_fingerprint": "565a562c7109a07f9af81c8d0015beae6ccd81dce1b9a7430ea978b8522a2197"
+      "data_fingerprint": "9b0f4780d9811bc75fe68c0172450090221b9686d6a3f3ca30b15d31ad9058d2"
     },
     {
       "task": {
@@ -941,12 +942,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "status",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "8f0057c9da8de42d99d660e9c0064bf2d78b3c457150b1383ebbb7c7fa216e38",
-      "data_fingerprint": "281ebbfab6a23d91703fe3c0f86fb4fec3e6de2f540f8f037fea95e014dac70d"
+      "data_fingerprint": "83c70e57ec4b534b6de1855eb753da17d5a3a266aa70896a83f8cf6035f01605"
     },
     {
       "task": {
@@ -964,12 +965,12 @@
       },
       "database_id": "validation-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75",
+      "database_sha256": "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "monthly",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "8e526c138e821a641bd506d325f6954266270501bdacd1c8d02264efcdc23d2f",
-      "data_fingerprint": "bb36fd38d166efcefcb4bc8652eabad6679475e4f84789ccb59ab3e5446d26e3"
+      "data_fingerprint": "14c1fd375bdd8200939ca8a73a9d5fae5848affbe7965b4c95729362164529a9"
     },
     {
       "task": {
@@ -987,12 +988,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "schema",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "6cdb8e9c1b0022e138c05ae64ab5939bbb7bd600609e0bda89aaae10da4ded77",
-      "data_fingerprint": "3e96830a5040027d113445fa76ca3adc118054519f46c8b0ba1bd61183ac453a"
+      "data_fingerprint": "56d78134f635d512103d53bfeb79dc8de0098120939cbce9028f624ab982388e"
     },
     {
       "task": {
@@ -1010,12 +1011,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "region",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "b56ecc9fe68d1f3739b4f09418610ed38ec1425ee4eb77f5b900a7fea037305d",
-      "data_fingerprint": "1d6ccd511ddec2f003fba675da51c6dc310d61b97c91100646934ea726583868"
+      "data_fingerprint": "a21a707c503b24ca94b9a22247e787fd853b4e841e2e300715c83ce08d633464"
     },
     {
       "task": {
@@ -1033,12 +1034,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "top",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "0a6fd9a225436e9cb4146858db10fb1e202fbb90453d46cadb9756994fb7a735",
-      "data_fingerprint": "84b0105871aa54da3cffb4896407d4132df5362031c558274de88337533dc672"
+      "data_fingerprint": "4dbec427c04b7c3fec46c3161ac0303bf9a511a7afdce82344a38cbcc3c8be56"
     },
     {
       "task": {
@@ -1056,12 +1057,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "customer",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "7701c2235509ad94f7489a72c1bb838f7d0fa3e3f351171789e67cdf3301c641",
-      "data_fingerprint": "af22acb79db8c19e97c7638ca1a67c5902b8b476a0949a5be4c19c3434abaeb9"
+      "data_fingerprint": "295bf6484da53c3024efffd28f7ba61acf8243f3e7aa3e16194e9b7ad7abc7aa"
     },
     {
       "task": {
@@ -1079,12 +1080,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "product",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "7e88ef4251418c086a6152e75d7d6247b3f689ec0d27630be323112b90d37280",
-      "data_fingerprint": "f394aa11c6cda74e8a13d49683e99ee39e12f4b6b515041a817256eed6e73f77"
+      "data_fingerprint": "641699dcea513fdda5b5fbe69f8eee4fb05157f429f612308fca5fac7fb37330"
     },
     {
       "task": {
@@ -1102,12 +1103,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "empty",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "5b7536e1961fe30b45a65a2851ee5e351d3b0a5cca1b6e63163c1dc61d95c81c",
-      "data_fingerprint": "5239b01469461beed4c9d82c18f168c6ab1848502e60d9fffbefb748007496f8"
+      "data_fingerprint": "1e69611292a2d51d88663c1391eff3e7016806898fc237f12c53988b9a5867af"
     },
     {
       "task": {
@@ -1125,12 +1126,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "constraints",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "d348cd9f91b794aef3bba2a890f69c5fcfd8df13eb194351e8605c5645f84e3d",
-      "data_fingerprint": "7c637e67dc16b225447b2851811244512e7677633de47bd2f06f04ecd8c62e94"
+      "data_fingerprint": "cfa1342e1a296267e2b821760971d6be08c60d2013bc67a159104d160605380b"
     },
     {
       "task": {
@@ -1148,12 +1149,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "recovery",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "3b5f05b2fe263a434cec4f8198d64a7d1b3183bd97bc266c2bf7fb9282f884f8",
-      "data_fingerprint": "5b65b284f72908fccb9e28a6c943e059296499139a27710f2c64bafecd06de7b"
+      "data_fingerprint": "c280f8761481398a5dc90282c2512c12689079624a3fd71b94f89d594653b66d"
     },
     {
       "task": {
@@ -1171,12 +1172,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "distinct",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "648898bead36728cf5c9ad56f8d9885b53f475ab1b42c77a47b0f5dd65ba4117",
-      "data_fingerprint": "df5d1e3b3d4cbcc25f7220798a1e142c798a047f91fa6cce958efc37df2e3a92"
+      "data_fingerprint": "a738331d38b7fd6dc14dc74969ba1230ba4a7e75e0821aaee50fd5b67f550545"
     },
     {
       "task": {
@@ -1194,12 +1195,12 @@
       },
       "database_id": "test-0",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "2252a1dd4f1316c66371693d5ad7215392c13a6cdf862f17f84e8958f00b2c09",
+      "database_sha256": "70e32cc8ce7f8e529db35dddfc1bf0afa82f41047169694117b2fd952ce900fe",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "basket",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "7a60ac6636cb5c9030be1073a6b2b52a5d84bd85627f63b7f68312e78a352b11",
-      "data_fingerprint": "68dfa852f1cd88c6fec34d548c72d18d69fb54890d53e7f1d84135196a1e8bc7"
+      "data_fingerprint": "a5cbb96e26636df946106ce979a090f6835ed8f86c14be0963c786ce7c9b81b9"
     },
     {
       "task": {
@@ -1217,12 +1218,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "schema",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "05abe75b304254b22e1cd0ae3ed1017b0126db10b94f424b165cf970242b7060",
-      "data_fingerprint": "301d17d3f306a439b20cb47f2aae00b29029c756d0b1ed72bfe984cb23fab606"
+      "data_fingerprint": "6136d0f835f161206985c0e54e46b9740ffdac6483d871a1318f63c07efbac56"
     },
     {
       "task": {
@@ -1240,12 +1241,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "region",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "90068b245051f92560716c343d1d733588443b14066f42048c2641a6e4799af3",
-      "data_fingerprint": "a87487ea744cbb29ae9c6f6ba65a5493d846affd97ac701efbeec99ab19a001b"
+      "data_fingerprint": "d54fe95fb7e77601904136bbbffb22266fda865eeb2701c9401bb59d29c7cad9"
     },
     {
       "task": {
@@ -1263,12 +1264,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "top",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "3719508b121205471943edffdd341998a5e16249183ef4644ede4f3daba3966b",
-      "data_fingerprint": "1d138004637529dbf422079b7dc0f5257194b30a04bc8a86ad736a811ad7b084"
+      "data_fingerprint": "5ce141ef55c64ac912ae47e1cd2de79e797cb3032eeac7cd6d518224f20c3f13"
     },
     {
       "task": {
@@ -1286,12 +1287,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "customer",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "459f19f1ce090d22b273fc1fbc0eea040b11d4a177949aee1e8875d0a219237c",
-      "data_fingerprint": "4ba54e30420cc3e004ab6c03aab08a1cf6a1c23506c098c9e2f37a3fc3dd103a"
+      "data_fingerprint": "b8ad80b4f70b843d82ad68f0afcd985420afca1b5cb58a2d919635643d827fbf"
     },
     {
       "task": {
@@ -1309,12 +1310,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "product",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "2c026a1eb5677ada5ecb37507a5c4f275384e10a0592176d7490ca328c51bdd9",
-      "data_fingerprint": "62de9513f84eaec7ce0c5fe619a32f3a4dd158eb3bc697e2c9a0a08a14758077"
+      "data_fingerprint": "edb325d884d2e12d0dc1b41559456de595c90b6d0ba3e6d2f8380003c6cfa87c"
     },
     {
       "task": {
@@ -1332,12 +1333,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "empty",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "5b7536e1961fe30b45a65a2851ee5e351d3b0a5cca1b6e63163c1dc61d95c81c",
-      "data_fingerprint": "58a08c67d3fbe8b1de10dde5cba84a5d82439b3a3471b8ea19420e5c57aec1ec"
+      "data_fingerprint": "395d10eef2a92d6615b1a9ec3cf61b042bd237b536c4db67fae858f42a661d6e"
     },
     {
       "task": {
@@ -1355,12 +1356,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "constraints",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "507f52ce0d88e507c2ae88667c343612dc8ee442427d7871626442423aeb9eac",
-      "data_fingerprint": "cd5ea90e6acda95e6b7d25ba24be24d8856c824a9764341370e7fab028d3fb5f"
+      "data_fingerprint": "b58ea582d24b2abcd18784e1e121a1143eba8d937b28f497c7367dc3f3c9ac43"
     },
     {
       "task": {
@@ -1378,12 +1379,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "recovery",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "3b5f05b2fe263a434cec4f8198d64a7d1b3183bd97bc266c2bf7fb9282f884f8",
-      "data_fingerprint": "a4cc4a61c9ddcccd430922150a2806cb36f69d47eb7a5719a42d426fa02c24b0"
+      "data_fingerprint": "99f687a803ee743425e6de57369eb18cab0819cebb7b7d7ce0fd404334b84105"
     },
     {
       "task": {
@@ -1401,12 +1402,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "distinct",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "648898bead36728cf5c9ad56f8d9885b53f475ab1b42c77a47b0f5dd65ba4117",
-      "data_fingerprint": "f8d83612b34e166d4d8cded7e70c8f38ac1ceed9a50ee342ea37ca70d02ce7a1"
+      "data_fingerprint": "59ce23be945d728c11ac4fe11ec4b4294108cccda435cfa01425016559e77690"
     },
     {
       "task": {
@@ -1424,12 +1425,12 @@
       },
       "database_id": "test-1",
       "database_version": "m2a-synthetic-v1",
-      "database_sha256": "6b19a29baf53cd68d73c76afea17cdce86b30045a8e918669dffecd508632557",
+      "database_sha256": "3061dd7ece5485cb3942c071761185282d3c7e66da199693f8876a5996efc0b0",
       "source": "project-authored synthetic task; no external benchmark",
       "template": "basket",
       "label_validation": "SQL vs independent Python",
       "expected_result_sha256": "b65fc9ddb101fed791a8b6fde8f56ec5fb39e145b315668fc7aee67307fb4506",
-      "data_fingerprint": "baebe2c4bb8a4d47a6d4bee3dd2ef0d90f5d39e2e9563a5db847c4b5f4b05b7a"
+      "data_fingerprint": "1114e145738cf4f36106c36c66602653879ff45975c67209141dd419cbf9ed40"
     }
   ],
   "split_counts": {
@@ -1437,5 +1438,5 @@
     "validation": 20,
     "test": 20
   },
-  "manifest_sha256": "bbc638387323b1be946be6d761d5dcd973de087d6ab94145e97389f471db6d56"
+  "manifest_sha256": "232ed8b69cdf8ba9a63d40413ae96794e00b22f339bb3f5041acf3dd71a67a0d"
 }

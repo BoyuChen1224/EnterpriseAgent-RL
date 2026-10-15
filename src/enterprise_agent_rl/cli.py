@@ -27,11 +27,14 @@ def main() -> None:
     ev.add_argument("--split", choices=["train", "validation", "test", "all"], default="test")
     ev.add_argument("--policy", choices=["fixture", "fixture-recovery", "local"], default="fixture")
     ev.add_argument("--endpoint", default="http://127.0.0.1:8001/v1/chat/completions")
-    ev.add_argument("--model", default="Qwen2.5-1.5B-Instruct")
+    ev.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct")
     ev.add_argument("--policy-version", default="local-untrained")
     ev.add_argument("--temperature", type=float, default=0)
     ev.add_argument("--max-tokens", type=int, default=512)
     ev.add_argument("--format-retries", type=int, default=1)
+    ev.add_argument("--top-p", type=float, default=1)
+    ev.add_argument("--generation-seed", type=int, default=17)
+    ev.add_argument("--parse-mode", choices=["strict", "json_fence"], default="json_fence")
     rp = sub.add_parser("replay")
     rp.add_argument("trajectory", type=Path)
     rp.add_argument("--database", type=Path, default=Path("artifacts/business.sqlite3"))
@@ -43,7 +46,7 @@ def main() -> None:
     api.add_argument("--output", type=Path, default=Path("artifacts/api"))
     api.add_argument("--port", type=int, default=8000)
     api.add_argument("--local-endpoint")
-    api.add_argument("--model", default="Qwen2.5-1.5B-Instruct")
+    api.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct")
     api.add_argument("--policy-version", default="local-untrained")
     args = parser.parse_args()
     configure_logging()
@@ -60,6 +63,9 @@ def main() -> None:
                     temperature=args.temperature,
                     max_tokens=args.max_tokens,
                     format_retries=args.format_retries,
+                    top_p=args.top_p,
+                    seed=args.generation_seed,
+                    parse_mode=args.parse_mode,
                 ),
             )
             if args.policy == "local"

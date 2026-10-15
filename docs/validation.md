@@ -76,3 +76,5 @@ Ruff 最终报告 All checks passed、18 files already formatted；pip check 报
 - 60 条新合成任务在原受限 SQLTool 上执行，并与独立 Python oracle 逐行一致；重建时校验冻结 manifest/database 指纹。
 
 GPU 型号、显存、驱动、sm_70 编译架构、Singularity passthrough、Qwen 内容生成与真实 Base 报告均 **Pending**。未提交收费 GPU 作业，协议测试不能解释为模型验收通过。细节见 [M2A](milestone-2a.md) 与 [V100](v100-compatibility.md)。
+
+首轮 M2A freecpuQ 作业 **20384068**（代码 `7a94940`）在 **node0928** 完成：free/normal、1 CPU/2 GB/5 分钟上限，无 GPU；**69 passed in 23.20s**，原 CPU smoke passed，Slurm **COMPLETED / 0:0 / 41s**。本地原始日志 `slurm-earl-cpu-smoke-20384068.out` 保留但不提交。随后为跨 SQLite 版本复现，将冻结任务清单改为 schema/数据内容指纹；轨迹文件字节哈希保持，并再次验证最终代码。

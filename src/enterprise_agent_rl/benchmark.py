@@ -23,6 +23,21 @@ def canonical_hash(value) -> str:
     ).hexdigest()
 
 
+def database_content_fingerprint(path: Path) -> str:
+    """Stable across SQLite builds; trajectories separately retain physical file hashes."""
+    with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as db:
+        schema = db.execute(
+            "SELECT type,name,tbl_name,sql FROM sqlite_master "
+            "WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name"
+        ).fetchall()
+        rows = {}
+        for table in ("regions", "customers", "products", "orders", "order_items"):
+            columns = [r[1] for r in db.execute(f"PRAGMA table_info({table})")]
+            ordering = ",".join(columns)
+            rows[table] = db.execute(f"SELECT * FROM {table} ORDER BY {ordering}").fetchall()
+    return canonical_hash({"schema": schema, "tables": rows})
+
+
 def create_instance(path: Path, split: str, instance: int) -> None:
     year, seed = SPLITS[split]
     initialize_database(path, seed + instance)
@@ -262,13 +277,16 @@ def python_oracle(database: Path, template: str, split: str, instance: int) -> l
 def build_manifest(directory: Path) -> dict:
     """Create reproducible DBs, validate every label against a Python oracle."""
     directory.mkdir(parents=True, exist_ok=True)
-    records, databases = [], []
+    records, databases, physical_files = [], [], []
     for split in SPLITS:
         for instance in range(2):
             db_id = f"{split}-{instance}"
             path = directory / f"{db_id}.sqlite3"
             create_instance(path, split, instance)
-            db_hash = database_fingerprint(path)
+            db_hash = database_content_fingerprint(path)
+            physical_files.append(
+                {"id": db_id, "file_sha256": database_fingerprint(path), "content_sha256": db_hash}
+            )
             databases.append(
                 {
                     "id": db_id,
@@ -305,7 +323,14 @@ def build_manifest(directory: Path) -> dict:
                 }
                 record["data_fingerprint"] = canonical_hash(record)
                 records.append(record)
+    (directory / "materialization.json").write_text(
+        json.dumps(
+            {"sqlite_version": sqlite3.sqlite_version, "databases": physical_files}, indent=2
+        )
+        + "\n"
+    )
     manifest = {
+        "database_fingerprint_kind": "sha256-canonical-schema-and-rows-v1",
         "version": VERSION,
         "databases": databases,
         "records": records,
@@ -328,7 +353,10 @@ def load_frozen_manifest(path: Path, database_root: Path) -> dict:
         if canonical_hash(fields) != record["data_fingerprint"]:
             raise ValueError("task_fingerprint_mismatch")
     for entry in manifest["databases"]:
-        if database_fingerprint(database_root / (entry["id"] + ".sqlite3")) != entry["sha256"]:
+        if (
+            database_content_fingerprint(database_root / (entry["id"] + ".sqlite3"))
+            != entry["sha256"]
+        ):
             raise ValueError("benchmark_database_changed")
     manifest["manifest_sha256"] = declared
     return manifest

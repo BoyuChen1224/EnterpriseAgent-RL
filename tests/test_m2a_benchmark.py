@@ -30,8 +30,17 @@ def test_sixty_labels_split_isolation_and_frozen_fingerprints(tmp_path):
     assert not names["validation"] & names["test"]
     assert len(templates["test"] - templates["train"] - templates["validation"]) == 2
     assert load_frozen_manifest(frozen_path, tmp_path / "databases") == manifest
-    with (tmp_path / "databases" / "test-0.sqlite3").open("ab") as stream:
-        stream.write(b"changed")
+    # VACUUM changes SQLite file metadata while preserving the dataset identity.
+    from enterprise_agent_rl.trajectories import database_fingerprint
+
+    db_path = tmp_path / "databases" / "test-0.sqlite3"
+    physical_before = database_fingerprint(db_path)
+    with sqlite3.connect(db_path) as db:
+        db.execute("VACUUM")
+    assert database_fingerprint(db_path) != physical_before
+    assert load_frozen_manifest(frozen_path, tmp_path / "databases") == manifest
+    with sqlite3.connect(tmp_path / "databases" / "test-0.sqlite3") as db:
+        db.execute("UPDATE customers SET name='tampered' WHERE id=1")
     with pytest.raises(ValueError, match="database_changed"):
         load_frozen_manifest(frozen_path, tmp_path / "databases")
     altered = tmp_path / "manifest.json"

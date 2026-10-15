@@ -9,7 +9,7 @@ bash scripts/setup/bootstrap_gpu.sh
 # 缓存下载不加载权重；先确认 quota 和网络。
 .venv-gpu/bin/python scripts/setup/cache_qwen.py --cache "$PWD/artifacts/model-cache"
 # 在一个新的目录重建数据库，并与已冻结清单逐字核对。
-.venv/bin/python scripts/evaluation/prepare_m2a.py --database-root artifacts/m2a-databases-new
+.venv/bin/python scripts/evaluation/prepare_m2a.py
 ```
 
 GPU 依赖环境不使用 CPU venv 的 site-packages，不修改原 CPU lock。GPU lock 固定所有传递依赖，`.venv-gpu`、权重、缓存、SQLite 与运行轨迹均忽略提交。模型下载仅 safetensors/配置/分词文件，固定 revision；缓存清单记录逐文件 SHA-256。模型服务 `local_files_only=True`，缓存缺失会失败，不在收费计算时间内隐式联网下载。
@@ -28,6 +28,8 @@ sbatch --account=<获准账户> --qos=<获准QOS> scripts/slurm/qwen_base.sbatch
 # Base 默认 validation。冻结 prompt/生成/预算配置后才开展最终测试：
 EARL_EVAL_SPLIT=test sbatch --account=<获准账户> --qos=<获准QOS> scripts/slurm/qwen_base.sbatch
 ```
+
+首次运行使用默认数据库目录；重复重建须用 `--database-root` 指定新目录，并在作业中用 `EARL_DATABASE_ROOT` 指向该目录，已有库不会覆盖。
 
 `EARL_MODEL_CACHE` 和 `EARL_GPU_PYTHON` 可覆盖缓存和解释器；`EARL_AUDIT_IMAGE` 指向已有 Singularity 镜像，以实测 `--nv`。未提供镜像则明确记录 pending。模型实验每个 job 使用新输出目录，拒绝覆盖已有证据。
 
@@ -59,7 +61,9 @@ Base 作业上限 1 小时，单任务最坏 600 秒；20 个任务全部接近�
 
 ## 冻结业务基准
 
-`benchmarks/m2a/manifest.json` 共 60 条任务，6 个数据库实例，train/validation/test 各 20 条、2 个实例。每条包含来源、schema/data 版本、reference_sql、split、模板、数据库 SHA-256、独立结果指纹与任务指纹。manifest SHA-256：`bbc638387323b1be946be6d761d5dcd973de087d6ab94145e97389f471db6d56`，由同目录 `.sha256` 固定。
+`benchmarks/m2a/manifest.json` 共 60 条任务，6 个数据库实例，train/validation/test 各 20 条、2 个实例。每条包含来源、schema/data 版本、reference_sql、split、模板、schema 与数据行的规范化 SHA-256、独立结果指纹与任务指纹。manifest SHA-256：`232ed8b69cdf8ba9a63d40413ae96794e00b22f339bb3f5041acf3dd71a67a0d`，由同目录 `.sha256` 固定。
+
+冻结清单使用逻辑 schema/数据指纹，避免 SQLite build/header 差异使相同业务数据失配；生成目录的 materialization.json 另记录 SQLite 版本与每个数据库文件的字节哈希。轨迹仍使用文件字节哈希进行严格 replay。
 
 各 split 使用不同 seed、年份（2021/2023/2025）、客户和商品名称；8 类公共模板（schema、区域 JOIN、Top-3 多步、指定客户、指定商品、空结果、复杂约束、错误恢复）及每个 split 2 类独占模板。测试独占去重客户数和订单件数约束。原 CPU 的 10 个任务保留作功能 smoke，不与冻结测试集混作泛化评估。
 
