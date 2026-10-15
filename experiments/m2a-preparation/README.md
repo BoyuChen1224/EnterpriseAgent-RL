@@ -15,3 +15,7 @@ CPU protocol tests use explicit test doubles; they are not saved or presented as
 Free CPU Slurm validation of implementation commit `7a94940`: job **20384068**, freecpuQ/free/normal, node **node0928**, COMPLETED, ExitCode **0:0**, elapsed **41 seconds**. In-job **69 passed in 23.20 seconds**; original CPU smoke passed. Source log: local ignored `slurm-earl-cpu-smoke-20384068.out`.
 
 During compatibility review, the initial SQLite byte-based benchmark freeze was replaced before any model evaluation or training with a schema/row content freeze. Physical file hashes remain in materialization evidence and runtime trajectories. This removes SQLite-build header differences from dataset identity without weakening replay checks.
+
+Pinned Qwen tokenizer CPU check passed: `tokenizer-check.json`, 180 prompt tokens, EOS 151645, assistant generation prefix verified. The full cache download was bounded to 120 seconds and exited 124 before weights completed; metadata/tokenizer files and an incomplete weights blob remain in ignored artifacts. There is no complete cache manifest or model-load result. Resume cache preparation before any future authorized GPU job.
+
+Final implementation commit **2d64e27** was validated by freecpuQ job **20384095** on **node0858** (free/normal, no GPU): **69 passed in 19.50s**, original CPU smoke **passed**, Slurm **COMPLETED / 0:0 / 37s**. Local ignored log: `slurm-earl-cpu-smoke-20384095.out`. This includes the portable manifest freeze and provenance/process-cleanup regression coverage.

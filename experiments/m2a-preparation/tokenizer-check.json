@@ -1,0 +1,9 @@
+{
+  "kind": "CPU tokenizer only; no model loaded",
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "chat_template_sha256": "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f",
+  "prompt_tokens": 180,
+  "eos_token_id": 151645,
+  "ends_with_assistant_prefix": true
+}

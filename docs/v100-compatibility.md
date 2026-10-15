@@ -15,9 +15,9 @@
 | Lustre 个人用量 | 2,579,951,548 KiB，约 2.40 TiB | `lfs quota -u "$USER" /public` |
 | Lustre 软/硬配额 | 3,221,225,472 / 4,294,967,296 KiB，即 3 / 4 TiB；软配额剩余约 613 GiB | 这是用户级配额；`df` 的共享剩余空间不能替代它 |
 | 旧 quota 命令 | `quota -s` 对历史 NFS 挂载报 stale file handle | 使用 Lustre 查询补齐；没有修改挂载 |
-| 模型缓存位置 | 默认项目 `artifacts/model-cache`，可用 `EARL_MODEL_CACHE` 显式指定 | 未扫描或复用其他项目模型；离线服务不自行下载 |
+| 模型缓存位置 | 默认项目 `artifacts/model-cache`，可用 `EARL_MODEL_CACHE` 显式指定 | 已取得 tokenizer/配置；权重限时下载未完成，无完整缓存清单；离线服务不自行下载 |
 
-独立 GPU 环境已实际安装；`pip check` 通过。登录节点仅完成 Torch 2.2.2+cu121、CUDA 编译版本 12.1、CPU tensor 及 Transformers 类导入检查；没有初始化 GPU 或加载模型。这证明当前 glibc 下的 CPU 导入兼容性，不证明计算节点驱动或 FP16 推理兼容性。
+独立 GPU 环境已实际安装；`pip check` 通过。登录节点仅完成 Torch 2.2.2+cu121、CUDA 编译版本 12.1、CPU tensor 及 Transformers 类导入检查；没有初始化 GPU 或加载模型。这证明当前 glibc 下的 CPU 导入兼容性，不证明计算节点驱动或 FP16 推理兼容性。实际固定 revision tokenizer 的 chat template 在 CPU 上通过，示例 prompt 为 180 token，eos_token_id=151645；见 `experiments/m2a-preparation/tokenizer-check.json`，不是模型内容生成结果。
 
 ## 必须由获准 GPU 作业补齐的证据
 

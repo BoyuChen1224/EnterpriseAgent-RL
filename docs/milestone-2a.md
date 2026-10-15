@@ -12,7 +12,7 @@ bash scripts/setup/bootstrap_gpu.sh
 .venv/bin/python scripts/evaluation/prepare_m2a.py
 ```
 
-GPU 依赖环境不使用 CPU venv 的 site-packages，不修改原 CPU lock。GPU lock 固定所有传递依赖，`.venv-gpu`、权重、缓存、SQLite 与运行轨迹均忽略提交。模型下载仅 safetensors/配置/分词文件，固定 revision；缓存清单记录逐文件 SHA-256。模型服务 `local_files_only=True`，缓存缺失会失败，不在收费计算时间内隐式联网下载。
+GPU 依赖环境不使用 CPU venv 的 site-packages，不修改原 CPU lock。GPU lock 固定所有传递依赖，`.venv-gpu`、权重、缓存、SQLite 与运行轨迹均忽略提交。模型下载仅 safetensors/配置/分词文件，固定 revision；缓存完成后清单记录逐文件 SHA-256。本轮限时 120 秒的下载未完成，已有配置和 tokenizer，权重仍有 `.incomplete` 文件；完整缓存清单尚未生成。再次运行同一缓存命令可继续下载。获准 GPU 作业前必须先完成缓存准备，不能把已有 tokenizer 视为权重就绪。模型服务 `local_files_only=True`，缓存缺失会失败，不在收费计算时间内隐式联网下载。
 
 服务必须位于 Slurm 分配的计算节点：检查 job ID、nodelist 中的实际 hostname、GPU 分配及单一可见 CUDA 设备；在检查前不 import Torch 或加载模型。HTTP 绑定 127.0.0.1，单 worker、串行生成，繁忙时结构化返回 model_busy。
 

@@ -78,3 +78,7 @@ Ruff 最终报告 All checks passed、18 files already formatted；pip check 报
 GPU 型号、显存、驱动、sm_70 编译架构、Singularity passthrough、Qwen 内容生成与真实 Base 报告均 **Pending**。未提交收费 GPU 作业，协议测试不能解释为模型验收通过。细节见 [M2A](milestone-2a.md) 与 [V100](v100-compatibility.md)。
 
 首轮 M2A freecpuQ 作业 **20384068**（代码 `7a94940`）在 **node0928** 完成：free/normal、1 CPU/2 GB/5 分钟上限，无 GPU；**69 passed in 23.20s**，原 CPU smoke passed，Slurm **COMPLETED / 0:0 / 41s**。本地原始日志 `slurm-earl-cpu-smoke-20384068.out` 保留但不提交。随后为跨 SQLite 版本复现，将冻结任务清单改为 schema/数据内容指纹；轨迹文件字节哈希保持，并再次验证最终代码。
+
+最终功能代码 **`2d64e27`** 的 freecpuQ 复验：作业 **20384095**，free/normal、**node0858**，**69 passed in 19.50s**，原 CPU smoke **passed**，Slurm **COMPLETED / ExitCode 0:0 / 37s**。本地日志 `slurm-earl-cpu-smoke-20384095.out` 保留但不提交。最终静态检查及 CPU/GPU 独立环境 pip check 通过；这里的 GPU 环境检查仅是 CPU 导入/依赖验证。
+
+固定 Qwen tokenizer/chat template 的 CPU 检查见 `experiments/m2a-preparation/tokenizer-check.json`；180 prompt token、EOS 151645、assistant prefix 正确。完整权重缓存的 120 秒准备窗口超时（exit 124），保留未完成 blob，无完整缓存清单。没有加载模型，后续 GPU 作业前须继续完成缓存。
