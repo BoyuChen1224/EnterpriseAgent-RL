@@ -1,0 +1,44 @@
+# 本次创建的文件
+
+初始仓库为空。以下是本次实际创建并纳入版本管理的文件；不含 `.venv`、数据库、模型、临时轨迹和 Slurm 日志。
+
+- `.github/workflows/cpu.yml`
+- `.gitignore`
+- `LICENSE`
+- `README.md`
+- `configs/agent/cpu.toml`
+- `docs/architecture.md`
+- `docs/environment-audit.md`
+- `docs/file-manifest.md`
+- `docs/implementation-log.md`
+- `docs/roadmap.md`
+- `docs/upstream-research.md`
+- `docs/validation.md`
+- `examples/api_client.py`
+- `experiments/cpu-mvp/README.md`
+- `experiments/cpu-mvp/comparison.json`
+- `experiments/cpu-mvp/fixture-report.json`
+- `experiments/cpu-mvp/recovery-report.json`
+- `pyproject.toml`
+- `requirements/cpu-py312-linux.lock`
+- `scripts/evaluation/cpu_smoke.py`
+- `scripts/setup/bootstrap.sh`
+- `scripts/slurm/cpu_evaluate.sbatch`
+- `scripts/slurm/cpu_smoke.sbatch`
+- `scripts/slurm/gpu_inventory.sbatch`
+- `src/enterprise_agent_rl/__init__.py`
+- `src/enterprise_agent_rl/agent.py`
+- `src/enterprise_agent_rl/cli.py`
+- `src/enterprise_agent_rl/common.py`
+- `src/enterprise_agent_rl/data.py`
+- `src/enterprise_agent_rl/environment.py`
+- `src/enterprise_agent_rl/evaluation.py`
+- `src/enterprise_agent_rl/rewards.py`
+- `src/enterprise_agent_rl/serving.py`
+- `src/enterprise_agent_rl/sql_worker.py`
+- `src/enterprise_agent_rl/tools.py`
+- `src/enterprise_agent_rl/trajectories.py`
+- `tests/conftest.py`
+- `tests/test_data_and_tools.py`
+- `tests/test_evaluation_api.py`
+- `tests/test_runtime.py`

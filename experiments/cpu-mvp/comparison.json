@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "task_ids": [
+    "region-2025",
+    "top-2025",
+    "inactive-2025",
+    "category-Hardware-2025",
+    "category-Software-2025"
+  ],
+  "database_sha256": "9c614dec9ffecbb57fb26158cb4a97ece334c5e97d42dcfef3b11c22496afbba",
+  "results": [
+    {
+      "episodes": 5,
+      "task_success_rate": 1.0,
+      "executable_sql_rate": 1.0,
+      "tool_error_rate": 0.0,
+      "average_tool_calls": 4.2,
+      "average_latency_s": 0.12360892752185464,
+      "average_tokens": 0,
+      "token_usage_known": true,
+      "average_end_to_end_cost": 0.0,
+      "cost_basis": "configured token/tool prices; excludes unmeasured GPU/CPU billing",
+      "policy_kind": "deterministic_fixture",
+      "policy_version": "fixture-v1",
+      "llm_capability_result": false
+    },
+    {
+      "episodes": 5,
+      "task_success_rate": 1.0,
+      "executable_sql_rate": 0.5454545454545454,
+      "tool_error_rate": 0.19230769230769232,
+      "average_tool_calls": 5.2,
+      "average_latency_s": 0.1681027294136584,
+      "average_tokens": 0,
+      "token_usage_known": true,
+      "average_end_to_end_cost": 0.0,
+      "cost_basis": "configured token/tool prices; excludes unmeasured GPU/CPU billing",
+      "policy_kind": "deterministic_fixture",
+      "policy_version": "fixture-v1-recovery",
+      "llm_capability_result": false
+    }
+  ],
+  "llm_capability_result": false,
+  "source_revision": "42bc006867c8654461b3feaf93b38e44edea7359"
+}

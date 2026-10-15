@@ -1,0 +1,159 @@
+{
+  "schema_version": "1.0",
+  "split": [
+    "test"
+  ],
+  "task_ids": [
+    "region-2025",
+    "top-2025",
+    "inactive-2025",
+    "category-Hardware-2025",
+    "category-Software-2025"
+  ],
+  "seed": 17,
+  "database_sha256": "9c614dec9ffecbb57fb26158cb4a97ece334c5e97d42dcfef3b11c22496afbba",
+  "settings": {
+    "seed": 17,
+    "max_actions": 16,
+    "max_tool_calls": 10,
+    "episode_timeout_s": 30,
+    "sql_timeout_s": 2,
+    "sql_max_rows": 100,
+    "sql_max_bytes": 65536,
+    "sql_memory_mb": 256,
+    "step_penalty": 0,
+    "repeat_penalty": 0,
+    "error_penalty": 0,
+    "recovery_bonus": 0,
+    "token_price_per_million": 0,
+    "tool_price": 0
+  },
+  "metrics": {
+    "episodes": 5,
+    "task_success_rate": 1.0,
+    "executable_sql_rate": 0.5454545454545454,
+    "tool_error_rate": 0.19230769230769232,
+    "average_tool_calls": 5.2,
+    "average_latency_s": 0.1681027294136584,
+    "average_tokens": 0,
+    "token_usage_known": true,
+    "average_end_to_end_cost": 0.0,
+    "cost_basis": "configured token/tool prices; excludes unmeasured GPU/CPU billing",
+    "policy_kind": "deterministic_fixture",
+    "policy_version": "fixture-v1-recovery",
+    "llm_capability_result": false
+  },
+  "episodes": [
+    {
+      "task_id": "region-2025",
+      "run_id": "76d2f431-80b1-4fba-8bce-fb22b84cc1a6",
+      "reward": {
+        "value": 1.0,
+        "success": true,
+        "reason": "success",
+        "components": {
+          "final_correct": true,
+          "business_constraints": true,
+          "business_probe_verified": true,
+          "within_budget": true,
+          "sql_execution_rate": 0.5,
+          "tool_errors": 1.0,
+          "repeated_calls": 0.0,
+          "error_recovered": true,
+          "auxiliary": 0.0
+        }
+      },
+      "terminal_reason": "completed"
+    },
+    {
+      "task_id": "top-2025",
+      "run_id": "80ba56a9-3edc-4264-b50e-4717659fd9e7",
+      "reward": {
+        "value": 1.0,
+        "success": true,
+        "reason": "success",
+        "components": {
+          "final_correct": true,
+          "business_constraints": true,
+          "business_probe_verified": true,
+          "within_budget": true,
+          "sql_execution_rate": 0.6666666666666666,
+          "tool_errors": 1.0,
+          "repeated_calls": 0.0,
+          "error_recovered": true,
+          "auxiliary": 0.0
+        }
+      },
+      "terminal_reason": "completed"
+    },
+    {
+      "task_id": "inactive-2025",
+      "run_id": "4806375e-dfdf-4c12-9766-12706cf8bb12",
+      "reward": {
+        "value": 1.0,
+        "success": true,
+        "reason": "success",
+        "components": {
+          "final_correct": true,
+          "business_constraints": true,
+          "business_probe_verified": true,
+          "within_budget": true,
+          "sql_execution_rate": 0.5,
+          "tool_errors": 1.0,
+          "repeated_calls": 0.0,
+          "error_recovered": true,
+          "auxiliary": 0.0
+        }
+      },
+      "terminal_reason": "completed"
+    },
+    {
+      "task_id": "category-Hardware-2025",
+      "run_id": "ff1f449c-fd73-4480-8f5b-254b45c32763",
+      "reward": {
+        "value": 1.0,
+        "success": true,
+        "reason": "success",
+        "components": {
+          "final_correct": true,
+          "business_constraints": true,
+          "business_probe_verified": true,
+          "within_budget": true,
+          "sql_execution_rate": 0.5,
+          "tool_errors": 1.0,
+          "repeated_calls": 0.0,
+          "error_recovered": true,
+          "auxiliary": 0.0
+        }
+      },
+      "terminal_reason": "completed"
+    },
+    {
+      "task_id": "category-Software-2025",
+      "run_id": "bebe645f-80e5-434d-8b4a-c2f32ce29890",
+      "reward": {
+        "value": 1.0,
+        "success": true,
+        "reason": "success",
+        "components": {
+          "final_correct": true,
+          "business_constraints": true,
+          "business_probe_verified": true,
+          "within_budget": true,
+          "sql_execution_rate": 0.5,
+          "tool_errors": 1.0,
+          "repeated_calls": 0.0,
+          "error_recovered": true,
+          "auxiliary": 0.0
+        }
+      },
+      "terminal_reason": "completed"
+    }
+  ],
+  "execution": {
+    "slurm_job_id": "20383968",
+    "node": "node0857",
+    "experiment_kind": "CPU deterministic fixture; no LLM executed"
+  },
+  "source_revision": "42bc006867c8654461b3feaf93b38e44edea7359"
+}
