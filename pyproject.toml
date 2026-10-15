@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools==75.8.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "enterprise-agent-rl"
+version = "0.1.0"
+description = "Verifiable multi-turn enterprise data agent and post-training foundation"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = ["pydantic==2.10.6", "fastapi==0.115.6", "uvicorn==0.34.0"]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.4", "pytest-cov==6.0.0", "httpx==0.28.1", "ruff==0.9.10"]
+
+[project.scripts]
+earl = "enterprise_agent_rl.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
