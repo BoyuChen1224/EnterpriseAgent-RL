@@ -5,27 +5,14 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --gres=gpu:tesla:1
-#SBATCH --mem=2G
-#SBATCH --time=00:02:00
+#SBATCH --mem=4G
+#SBATCH --time=00:03:00
 #SBATCH --output=slurm-%x-%j.out
-# Prepared only: not submitted during Milestone 0-1. Choose account/QOS when authorized.
+# Paid queue: prepare only; submit only after explicit user authorization.
+# Supply --account and --qos explicitly at submission, never infer free GPU access.
 set -euo pipefail
-[[ -n "${SLURM_JOB_ID:-}" ]] || { echo 'Run via sbatch, never on login'; exit 2; }
-hostname
-nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv
-nvidia-smi
-command -v nvcc >/dev/null && nvcc --version
-ldd --version | head -1
-.venv/bin/python - <<'PYCODE'
-import importlib.util
-if importlib.util.find_spec("torch") is None:
-    print("torch absent in selected environment; metadata only")
-else:
-    import torch
-    print("torch", torch.__version__, "compiled CUDA", torch.version.cuda)
-    if torch.cuda.is_available():
-        print("device",torch.cuda.get_device_name(0))
-        print("compute capability",torch.cuda.get_device_capability(0))
-        print("memory bytes",torch.cuda.get_device_properties(0).total_memory)
-        print("compiled architectures",torch.cuda.get_arch_list())
-PYCODE
+cd "${SLURM_SUBMIT_DIR:?submit from repository root}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+if type module >/dev/null 2>&1; then module load singularity/3.11.2; fi
+python_bin="${EARL_GPU_PYTHON:-.venv-gpu/bin/python}"
+srun "$python_bin" scripts/inference/gpu_inventory.py --output "artifacts/gpu-inventory-${SLURM_JOB_ID:?}"

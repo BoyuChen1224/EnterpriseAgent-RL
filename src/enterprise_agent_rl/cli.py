@@ -10,6 +10,7 @@ from enterprise_agent_rl.agent import DeterministicPolicy, LocalModelPolicy
 from enterprise_agent_rl.common import Settings, configure_logging
 from enterprise_agent_rl.data import benchmark_tasks, initialize_database
 from enterprise_agent_rl.evaluation import compare_reports, evaluate
+from enterprise_agent_rl.model_protocol import GenerationSettings
 from enterprise_agent_rl.serving import create_app
 from enterprise_agent_rl.trajectories import TrajectoryStore, replay
 
@@ -28,6 +29,9 @@ def main() -> None:
     ev.add_argument("--endpoint", default="http://127.0.0.1:8001/v1/chat/completions")
     ev.add_argument("--model", default="Qwen2.5-1.5B-Instruct")
     ev.add_argument("--policy-version", default="local-untrained")
+    ev.add_argument("--temperature", type=float, default=0)
+    ev.add_argument("--max-tokens", type=int, default=512)
+    ev.add_argument("--format-retries", type=int, default=1)
     rp = sub.add_parser("replay")
     rp.add_argument("trajectory", type=Path)
     rp.add_argument("--database", type=Path, default=Path("artifacts/business.sqlite3"))
@@ -48,7 +52,16 @@ def main() -> None:
         print(initialize_database(args.database, settings.seed))
     elif args.command == "evaluate":
         policy = (
-            LocalModelPolicy(args.endpoint, args.model, args.policy_version)
+            LocalModelPolicy(
+                args.endpoint,
+                args.model,
+                args.policy_version,
+                GenerationSettings(
+                    temperature=args.temperature,
+                    max_tokens=args.max_tokens,
+                    format_retries=args.format_retries,
+                ),
+            )
             if args.policy == "local"
             else DeterministicPolicy(recover_error=args.policy == "fixture-recovery")
         )

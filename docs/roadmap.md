@@ -2,14 +2,18 @@
 
 当前验收覆盖 CPU 数据与执行链路，尚无真实 LLM 基线、SFT、GRPO 或模型性能提升数据。以下是实施顺序，不是已完成清单。
 
+## M2A 当前交付
+
+已在 `dev/qwen-base-inference` 实现固定 Qwen revision 的 FP16/eager 服务、原始动作审计、独立推理预算、冻结 60 任务及 Slurm 运行入口。真实 GPU 和 Base 评测等待收费授权，具体完成/待验收边界见 [M2A](milestone-2a.md) 与 [V100](v100-compatibility.md)。本轮不开展 SFT/GRPO。
+
 ## M2：设备审计与最小兼容闭环
 
-1. 从 `docs/environment-audit.md` 复核用户政策、个人存储 quota、可选 GPU 账户/QOS。选择单卡 gpu2Q、显式短时限，先提交已准备的 `scripts/slurm/gpu_inventory.sbatch`。不要在登录节点运行 nvidia-smi 推理/模型加载，不使用八卡长期作业。
+1. 从 `docs/environment-audit.md` 复核用户政策、个人存储 quota、可选 GPU 账户/QOS。仅在获得用户新的明确收费授权后，选择单卡 gpu2Q、显式短时限，先提交已准备的 `scripts/slurm/gpu_inventory.sbatch`。不要在登录节点运行 nvidia-smi 推理/模型加载，不使用八卡长期作业。
 2. 采集 GPU 型号、实际显存、驱动、CC、CUDA wheel 架构与容器执行情况，决定独立 Python 3.11/3.12 GPU 环境和 CUDA 依赖。优先 Transformers FP16 + eager，无 BF16/FA2 默认值。完整依赖锁与 CPU 锁分离。
 3. 在已有许可和存储空间下下载 Qwen2.5-1.5B-Instruct 的固定 revision，先单轮 32–128 token，再使用 LocalModelPolicy 跑一个多轮任务。记录峰值 allocated/reserved、生成 token/s、首次加载和端到端 latency、错误与环境元数据。3B 待 1.5B 通过后评估。
 4. 在隔离环境验证微批次 1 的 LoRA SFT 数步，FP16 GradScaler、梯度裁剪、有限 loss/grad、checkpoint 保存与恢复；保存 model/optimizer/scheduler/scaler/RNG/sampler 状态。
 5. 验证上游 GRPO 后端是否能避开 FA2/BF16 路径；用真实环境按同一任务采多条不同轨迹，验证终局 reward、response-only mask、group advantage 和有限梯度。未通过前不做正式训练。
-6. 产出 `docs/v100-compatibility.md`，逐条区分已运行、失败和候选。当前未生成该文件，避免把预案当作实测报告。
+6. 产出 `docs/v100-compatibility.md`，逐条区分已运行、失败和候选。该文件已记录登录节点实测元数据，GPU 字段保持 Pending，不能把预案当作实测报告。
 
 ## M3：SFT
 

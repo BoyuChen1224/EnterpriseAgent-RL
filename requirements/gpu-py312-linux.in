@@ -1,0 +1,9 @@
+# Candidate CUDA 12.1 wheel stack for glibc 2.17 / Volta; GPU validation pending.
+-r cpu-py312-linux.lock
+torch==2.2.2
+transformers==4.46.3
+numpy==1.26.4
+huggingface-hub==0.26.5
+tokenizers==0.20.3
+safetensors==0.4.5
+nvidia-nvjitlink-cu12==12.1.105

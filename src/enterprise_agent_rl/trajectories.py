@@ -13,6 +13,7 @@ from pydantic import Field, model_validator
 
 from enterprise_agent_rl.common import Action, Contract, Observation, PublicTask, Settings
 from enterprise_agent_rl.environment import DataEnvironment
+from enterprise_agent_rl.model_protocol import parse_action
 
 
 class StepRecord(Contract):
@@ -25,6 +26,7 @@ class StepRecord(Contract):
     prompt_tokens: int = Field(ge=0)
     completion_tokens: int = Field(ge=0)
     token_usage_known: bool
+    model_attempts: list[dict] = Field(default_factory=list)
     elapsed_s: float = Field(ge=0)
 
 
@@ -36,7 +38,9 @@ class RewardResult(Contract):
 
 
 class Trajectory(Contract):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.1"
+    runtime_errors: list[dict] = Field(default_factory=list)
+    policy_metadata: dict = Field(default_factory=dict)
     run_id: str
     task: PublicTask
     policy_version: str
@@ -48,6 +52,7 @@ class Trajectory(Contract):
     final_answer: dict | None
     terminal_reason: str
     reward: RewardResult | None = None
+    model_attempts: list[dict] = Field(default_factory=list)
     elapsed_s: float = Field(ge=0)
 
     @model_validator(mode="after")
@@ -64,6 +69,17 @@ class Trajectory(Contract):
             if step.tool_name != expected_tool:
                 raise ValueError("tool_name_mismatch")
             previous = step.tool_result
+        if self.schema_version == "1.1" and self.policy_kind == "local_llm":
+            recorded = []
+            for step in self.steps:
+                if not step.model_attempts:
+                    raise ValueError("local_step_requires_actual_generation")
+                parsed, _ = parse_action(step.model_attempts[-1]["raw_output"])
+                if parsed != step.action:
+                    raise ValueError("executed_action_differs_from_model_output")
+                recorded.extend(step.model_attempts)
+            if self.model_attempts[: len(recorded)] != recorded:
+                raise ValueError("generation_history_mismatch")
         if self.terminal_reason == "completed":
             if not self.steps or not previous.terminated or previous.reason != "completed":
                 raise ValueError("completion_requires_terminal_step")

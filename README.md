@@ -2,7 +2,7 @@
 
 基于多轮工具调用与可验证反馈的企业数据分析 Agent 后训练工程。
 
-**当前版本：Milestone 0–1 的 CPU 可运行基础。** 已实现真实 SQLite 工具执行、多轮环境、轨迹采集/回放、程序化奖励、离线评测和 FastAPI。默认使用已知任务模板的确定性策略，无 GPU、模型权重或 API Key 也能验收完整流程。**尚未执行 Base LLM、SFT 或 GRPO 实验，没有模型能力提升结论。**
+**当前版本：CPU MVP + Milestone 2A 推理工程准备；GPU 验收 Pending。** 已实现真实 SQLite 工具执行、多轮环境、轨迹采集/回放、程序化奖励、离线评测和 FastAPI。默认使用已知任务模板的确定性策略，无 GPU、模型权重或 API Key 也能验收完整流程。**尚未执行 Base LLM、SFT 或 GRPO 实验，没有模型能力提升结论。**
 
 ## 快速运行
 
@@ -77,6 +77,12 @@ python examples/api_client.py
 
 提供 `benchmark_task_id` 时 prompt 必须与该公开任务严格一致，才执行隐藏验证；自定义 prompt 的 reward 为 null，标为 `unscored_custom_prompt`。`completed` 表示执行完成，是否业务正确应查看 `reward.success`。状态写入独立 SQLite；服务重启后未完成任务标为 `server_restarted`，已完成轨迹可继续查询。
 
+## Milestone 2A：Qwen 推理工程
+
+新增独立 GPU 依赖锁、固定 Qwen2.5-1.5B-Instruct revision 的 Transformers FP16/eager 服务、Slurm 计算节点检查、进程回收、原始生成审计，以及 60 条经独立 Python 核算并冻结的业务任务（train/validation/test 各 20）。原 CPU 功能与 10 条 smoke 任务保留。
+
+**尚无收费 GPU 作业授权，未加载 Qwen，真实多轮推理、Base 成功率、显存与速度均为 Pending。** 详情见 [M2A 运行手册](docs/milestone-2a.md) 和 [V100 兼容性证据](docs/v100-compatibility.md)。只在取得新授权后提交其中 GPU 脚本。
+
 ## 真实本地模型接口
 
 `LocalModelPolicy` 已实现 OpenAI 兼容 JSON 聊天端点适配，逐轮提交完整可见历史，记录模型返回的 token 使用量。CLI 和 API 均可选择模型版本。调用必须位于 Slurm 作业内，端点仅允许本计算节点的 loopback HTTP；本次只验证传输协议和登录节点拦截，没有加载 Qwen。
@@ -88,7 +94,7 @@ earl --config configs/agent/cpu.toml evaluate --policy local   --endpoint http:/
 earl serve --local-endpoint http://127.0.0.1:8001/v1/chat/completions   --model Qwen2.5-1.5B-Instruct --policy-version qwen-base-r1
 ```
 
-模型服务端的 Transformers FP16/eager 路径、显存和速度验证属于 Milestone 2；不能把客户端协议测试解释为模型兼容性通过。没有安装 vLLM、FlashAttention、TRL 或 verl。依赖选择依据及真实上游源码版本见 [上游调研](docs/upstream-research.md)。
+模型服务端已实现 Transformers FP16/eager 路径；显存、速度及真实模型兼容性仍待授权 GPU 实测，不能把客户端协议测试解释为模型兼容性通过。没有安装 vLLM、FlashAttention、TRL 或 verl。依赖选择依据及真实上游源码版本见 [上游调研](docs/upstream-research.md)。
 
 ## 当前结果与路线图
 
@@ -98,7 +104,7 @@ earl serve --local-endpoint http://127.0.0.1:8001/v1/chat/completions   --model 
 |---|---|
 | M0 | 仓库、环境审计、架构、包/配置/日志/测试/锁定依赖已落地；GPU 设备级信息待计算节点采集 |
 | M1 | CPU 工具、环境、策略、轨迹、奖励、评测、API 贯通并验收 |
-| M2 | 待开展：单卡短作业采集设备信息，再验证 Qwen FP16、多轮推理、SFT/GRPO 最小步 |
+| M2A | 推理服务、输出审计、冻结 60 任务基准与 Slurm 脚本已实现；真实 GPU / Qwen / Base 评测 Pending |
 | M3 | 待开展：扩大任务集、严格隔离 SFT 训练/验证/测试、LoRA SFT 与恢复 |
 | M4 | 待开展：真实环境 rollout、经过验证的上游 GRPO、Base/SFT/RL 与奖励消融 |
 | M5 | 待开展：部署、模型版本对照、完整实验报告及基于真实证据的简历总结 |

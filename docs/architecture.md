@@ -76,7 +76,9 @@ API 单进程、loopback，容量上限 8 个待执行/执行中任务。比较�
 
 状态存于独立 jobs.sqlite3，轨迹原子落盘。重启后原 running/queued 标为 failed/server_restarted，便于人工重试；不宣称任务透明恢复。多进程部署、认证、多租户和外部队列尚未实现。
 
-本地模型通过 OpenAI 兼容 `/v1/chat/completions`、严格单 JSON Action 接入。请求只携带公开 prompt 与工具历史，使用 temperature=0、单轮最多 512 新 token。端点限定为当前 Slurm 节点 loopback，防止登录节点发起推理或意外访问外部计费服务。没有对真实端点执行请求；Qwen 的加载和数值兼容属于 M2。
+本地模型通过 OpenAI 兼容 `/v1/chat/completions` 接入，生成设置可配置，默认 temperature=0、512 新 token、一次格式重试。仅允许完整 JSON 或整体 JSON fence 的受限规范化，参数错误明确分类，不补 SQL 或业务答案。M2A 新增 FP16/eager Transformers 服务，启动时检查 Slurm 计算节点及单卡分配；真实 Qwen 运行仍待授权。
+
+CPU 默认 episode 30 秒，Qwen 配置 episode 600 秒、decide 120 秒（含重试），SQL 独立 2 秒。v1.1 轨迹新增逐次 raw model_attempts，包含未形成合法 Action 的输出、错误和 telemetry；校验执行 Action 必须与原始生成解析结果一致。v1.0 仍可读取。60 任务多库冻结清单在 verifier 侧加载，策略只获得 PublicTask。具体指标口径和进程回收见 [M2A 运行手册](milestone-2a.md)。
 
 ## 后训练边界
 

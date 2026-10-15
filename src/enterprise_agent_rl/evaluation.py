@@ -13,10 +13,15 @@ from enterprise_agent_rl.rewards import verify
 from enterprise_agent_rl.trajectories import Trajectory, TrajectoryStore, database_fingerprint
 
 
-def summarize(trajectories: list[Trajectory], settings: Settings) -> dict:
+def summarize(
+    trajectories: list[Trajectory], settings: Settings, *, allow_multiple_databases: bool = False
+) -> dict:
     if not trajectories or any(t.reward is None for t in trajectories):
         raise ValueError("evaluation_requires_scored_episodes")
-    policy_keys = {(t.policy_kind, t.policy_version, t.database_sha256) for t in trajectories}
+    policy_keys = {
+        (t.policy_kind, t.policy_version, None if allow_multiple_databases else t.database_sha256)
+        for t in trajectories
+    }
     if len(policy_keys) != 1:
         raise ValueError("cannot_mix_policies_or_databases")
     sql = [s for t in trajectories for s in t.steps if s.tool_name == "sql"]
@@ -31,7 +36,46 @@ def summarize(trajectories: list[Trajectory], settings: Settings) -> dict:
     ]
     calls = [sum(s.tool_name is not None for s in t.steps) for t in trajectories]
     avg_tokens = mean(token_counts) if tokens_known else None
+    attempts = [a for t in trajectories for a in t.model_attempts]
+    outputs = [a for a in attempts if a.get("raw_output") is not None]
+    telemetry = [a.get("telemetry", {}) for a in attempts]
+    measured = [m for m in telemetry if m.get("generation_latency_s", 0) > 0]
+    total_generation_s = sum(m["generation_latency_s"] for m in measured)
+    measured_tokens = sum(
+        a.get("usage", {}).get("completion_tokens", 0)
+        for a in attempts
+        if a.get("telemetry", {}).get("generation_latency_s", 0) > 0
+    )
+    error_codes = [a["error"] for a in attempts if a.get("error")]
+    invalid_codes = {"empty_output", "invalid_json", "invalid_action", "invalid_action_arguments"}
     return {
+        "action_format_validity_rate": (
+            sum(a.get("format_valid", False) for a in outputs) / len(outputs)
+        )
+        if outputs
+        else None,
+        "strict_action_format_validity_rate": (
+            sum(a.get("strict_format_valid", False) for a in outputs) / len(outputs)
+        )
+        if outputs
+        else None,
+        "model_requests": len(attempts),
+        "model_outputs": len(outputs),
+        "generation_throughput_tokens_per_s": (measured_tokens / total_generation_s)
+        if total_generation_s
+        else None,
+        "gpu_peak_allocated_bytes": max(
+            (m["peak_allocated_bytes"] for m in telemetry if "peak_allocated_bytes" in m),
+            default=None,
+        ),
+        "gpu_peak_reserved_bytes": max(
+            (m["peak_reserved_bytes"] for m in telemetry if "peak_reserved_bytes" in m),
+            default=None,
+        ),
+        "timeout_episodes": sum("timeout" in t.terminal_reason for t in trajectories),
+        "inference_timeout_count": error_codes.count("inference_timeout"),
+        "oom_count": error_codes.count("oom"),
+        "invalid_output_count": sum(c in invalid_codes for c in error_codes),
         "episodes": len(trajectories),
         "task_success_rate": mean(float(t.reward.success) for t in trajectories),
         "executable_sql_rate": sum(s.tool_result.ok for s in sql) / len(sql) if sql else None,
@@ -61,6 +105,7 @@ def evaluate(
         trajectory = run_episode(
             task.public, policy, database, settings, output / "sql-audit.jsonl"
         )
+        store.save(trajectory)
         trajectory = trajectory.model_copy(update={"reward": verify(task, trajectory, database)})
         store.save(trajectory)
         trajectories.append(trajectory)

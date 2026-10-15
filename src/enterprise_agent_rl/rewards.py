@@ -59,7 +59,17 @@ def verify(
             and step.tool_result.result.get("rows") == probe["rows"]
             for step in sql_steps
         )
-    constraints = within_budget and successful_sql >= task.min_sql_calls and probe_verified
+    schema_verified = not task.required_schema or any(
+        s.tool_name == "schema" and s.tool_result.ok for s in trajectory.steps
+    )
+    recovery_verified = not task.required_sql_error or recovered
+    constraints = (
+        within_budget
+        and successful_sql >= task.min_sql_calls
+        and probe_verified
+        and schema_verified
+        and recovery_verified
+    )
     success = correct and constraints and trajectory.terminal_reason == "completed"
     # Correct tasks stay >=0.9, failed tasks get zero. No incentive for repeated recovery.
     auxiliary = (
@@ -80,6 +90,8 @@ def verify(
             "final_correct": correct,
             "business_constraints": constraints,
             "business_probe_verified": probe_verified,
+            "schema_verified": schema_verified,
+            "recovery_verified": recovery_verified,
             "within_budget": within_budget,
             "sql_execution_rate": successful_sql / max(1, len(sql_steps)),
             "tool_errors": errors,

@@ -25,3 +25,7 @@ datasets/
 *.pem
 slurm-*.out
 logs/
+
+.venv-gpu/
+.cache/
+*.sif

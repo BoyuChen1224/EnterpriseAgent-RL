@@ -1,0 +1,13 @@
+model_id = "Qwen/Qwen2.5-1.5B-Instruct"
+revision = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+dtype = "float16"
+attention = "eager"
+max_context_tokens = 8192
+
+[generation]
+temperature = 0.0
+top_p = 1.0
+max_tokens = 512
+format_retries = 1
+parse_mode = "json_fence"
+seed = 17

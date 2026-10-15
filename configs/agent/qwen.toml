@@ -1,0 +1,6 @@
+seed = 17
+max_actions = 20
+max_tool_calls = 14
+episode_timeout_s = 600
+inference_timeout_s = 120
+sql_timeout_s = 2

@@ -28,6 +28,8 @@ class BenchmarkTask(Contract):
     ordered: bool = False
     min_sql_calls: int = 1
     required_probe_sql: str | None = None
+    required_schema: bool = False
+    required_sql_error: bool = False
 
 
 def initialize_database(path: Path, seed: int = 17) -> Path:

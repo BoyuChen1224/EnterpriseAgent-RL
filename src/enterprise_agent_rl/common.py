@@ -19,7 +19,8 @@ class Settings(Contract):
     seed: int = 17
     max_actions: int = Field(default=16, ge=2, le=100)
     max_tool_calls: int = Field(default=10, ge=1, le=50)
-    episode_timeout_s: float = Field(default=30, gt=0, le=300)
+    episode_timeout_s: float = Field(default=30, gt=0, le=7200)
+    inference_timeout_s: float = Field(default=120, gt=0, le=1800)
     sql_timeout_s: float = Field(default=2, gt=0, le=10)
     sql_max_rows: int = Field(default=100, ge=1, le=1000)
     sql_max_bytes: int = Field(default=65536, ge=256, le=1048576)
@@ -62,6 +63,7 @@ class Decision(Contract):
     prompt_tokens: int = Field(default=0, ge=0)
     completion_tokens: int = Field(default=0, ge=0)
     token_usage_known: bool = True
+    model_attempts: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def configure_logging() -> None:

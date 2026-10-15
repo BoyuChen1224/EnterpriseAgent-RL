@@ -64,3 +64,15 @@ Ruff 最终报告 All checks passed、18 files already formatted；pip check 报
 ## 未运行
 
 没有提交 GPU 作业；没有确认设备级显存/驱动/CC；没有加载 Qwen、运行 FP16 推理、SFT、GRPO、checkpoint 恢复、GPU 性能比较、BIRD 评测或公开部署。CPU fixture 的 token 为 0，配置单价为 0，不代表真实 LLM 或集群费用为零。Base/SFT/RL 三组结果尚不存在。
+
+## Milestone 2A CPU 工程验证
+
+本节追加于 CPU MVP 验收之后，基线为 `cde59eb`，开发分支 `dev/qwen-base-inference`。
+
+- 修改 Runtime 后、添加新测试前，原有 **48 passed in 11.25s**。
+- 新增输出解析/重试、失败原文保存、结构化 OOM/timeout、推理预算、Slurm 主机检查、Action 来源校验、真实子进程回收、冻结标签 oracle 与多库报告故障保留；最终本地 **69 passed in 20.40s**。
+- Ruff check、format check、shell `bash -n`、git diff --check 通过。
+- CPU `.venv` 的 `pip check` 仍通过；独立 GPU 环境 `pip check` 通过，Torch 2.2.2+cu121 / Transformers 4.46.3 在 CPU 上导入成功。没有在登录节点探测 GPU、加载权重或推理。
+- 60 条新合成任务在原受限 SQLTool 上执行，并与独立 Python oracle 逐行一致；重建时校验冻结 manifest/database 指纹。
+
+GPU 型号、显存、驱动、sm_70 编译架构、Singularity passthrough、Qwen 内容生成与真实 Base 报告均 **Pending**。未提交收费 GPU 作业，协议测试不能解释为模型验收通过。细节见 [M2A](milestone-2a.md) 与 [V100](v100-compatibility.md)。
