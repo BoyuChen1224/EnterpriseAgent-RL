@@ -60,7 +60,7 @@ def main() -> None:
             "id": model.model_id,
             "revision": model.revision,
             "dtype": model.dtype,
-            "attention": model.attention,
+            "attention_backend": model.attention_backend,
             "config_sha256": sha256(args.model_config),
         },
         "generation": model.generation.model_dump(),

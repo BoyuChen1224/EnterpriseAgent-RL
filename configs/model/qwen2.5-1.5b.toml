@@ -1,7 +1,7 @@
 model_id = "Qwen/Qwen2.5-1.5B-Instruct"
 revision = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
 dtype = "float16"
-attention = "eager"
+attention_backend = "sdpa_math"
 max_context_tokens = 8192
 
 [generation]

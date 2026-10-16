@@ -82,7 +82,7 @@ def verify(cache: Path, config: Path) -> dict:
         "model": cfg.model_id,
         "revision": cfg.revision,
         "dtype": cfg.dtype,
-        "attention": cfg.attention,
+        "attention_backend": cfg.attention_backend,
         "cache": str(cache),
         "snapshot": str(snapshot),
         "required_files_missing": missing,

@@ -35,8 +35,9 @@ import time
 import tomllib
 import types
 from collections import Counter
+from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any
 
 MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
 REVISION = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
@@ -134,10 +135,9 @@ def verify_cache(cache: Path) -> dict[str, Any]:
                 manifest_record = manifest.get("files", {}).get(name, {})
                 record["manifest_bytes"] = manifest_record.get("bytes")
                 record["manifest_sha256"] = manifest_record.get("sha256")
-                record["matches_manifest"] = (
-                    record["bytes"] == manifest_record.get("bytes")
-                    and record["sha256"] == manifest_record.get("sha256")
-                )
+                record["matches_manifest"] = record["bytes"] == manifest_record.get(
+                    "bytes"
+                ) and record["sha256"] == manifest_record.get("sha256")
         file_records[name] = record
 
     incomplete_blobs = sorted(path.name for path in (repo / "blobs").glob("*.incomplete"))
@@ -319,9 +319,7 @@ def logits_sanity(tokenizer: Any, outputs: Any, label: str) -> dict[str, Any]:
         "final_position_top_20": top_tokens,
         "top_1_probability": top1_probability,
         "top_5_probability_mass": top5_mass,
-        "top_token_is_exclamation": bool(
-            top_tokens and top_tokens[0]["decoded_token"] == "!"
-        ),
+        "top_token_is_exclamation": bool(top_tokens and top_tokens[0]["decoded_token"] == "!"),
     }
 
 
@@ -367,7 +365,7 @@ def first_tensor(value: Any) -> Any:
 
     if torch.is_tensor(value):
         return value
-    if isinstance(value, (tuple, list)):
+    if isinstance(value, tuple | list):
         for item in value:
             found = first_tensor(item)
             if found is not None:
@@ -448,6 +446,7 @@ def attention_forward_impl(
     """Runtime copy of Qwen2Attention.forward with optional FP32 score math."""
 
     import math as _math
+
     import torch
     from transformers.models.qwen2.modeling_qwen2 import apply_rotary_pos_emb, repeat_kv
 
@@ -460,8 +459,12 @@ def attention_forward_impl(
     attention_trace_hook(self, "value_linear", value_states)
 
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(
+        1, 2
+    )
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(
+        1, 2
+    )
     attention_trace_hook(self, "query_states", query_states)
     attention_trace_hook(self, "key_states", key_states)
     attention_trace_hook(self, "value_states", value_states)
@@ -520,9 +523,7 @@ def attention_forward_impl(
     attention_trace_hook(self, "attention_output", attention_output)
 
     if attention_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
-        raise ValueError(
-            f"attention output has unexpected size {attention_output.size()}"
-        )
+        raise ValueError(f"attention output has unexpected size {attention_output.size()}")
     attention_output = attention_output.transpose(1, 2).contiguous()
     attention_output = attention_output.reshape(bsz, q_len, self.hidden_size)
     attention_output = self.o_proj(attention_output)
@@ -537,9 +538,7 @@ def traced_attention_forward(self: Any, *args: Any, **kwargs: Any) -> tuple[Any,
     return attention_forward_impl(self, *args, **kwargs, score_dtype=None)
 
 
-def fp32_score_attention_forward(
-    self: Any, *args: Any, **kwargs: Any
-) -> tuple[Any, Any, Any]:
+def fp32_score_attention_forward(self: Any, *args: Any, **kwargs: Any) -> tuple[Any, Any, Any]:
     import torch
 
     return attention_forward_impl(self, *args, **kwargs, score_dtype=torch.float32)
@@ -581,7 +580,7 @@ class GpuMonitor:
         self.stdout: Any = None
         self.stderr: Any = None
 
-    def __enter__(self) -> "GpuMonitor":
+    def __enter__(self) -> GpuMonitor:
         self.stdout = self.output_path.open("w")
         self.stderr = self.stderr_path.open("w")
         query = ",".join(GPU_QUERY_FIELDS)
@@ -781,6 +780,7 @@ def register_guard(model: Any, guard: FiniteLogitGuard) -> list[Any]:
             model.register_forward_hook(guard.post_hook, with_kwargs=True),
         ]
     except TypeError:  # pragma: no cover - only for older torch APIs
+
         def pre_legacy(module: Any, args: tuple[Any, ...]) -> None:
             guard.pre_hook(module, args, {})
 
@@ -852,12 +852,16 @@ def load_model(
         "trust_remote_code": False,
         "use_safetensors": True,
     }
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        torch_dtype=dtype,
-        attn_implementation=attention,
-        **load_kwargs,
-    ).to("cuda:0").eval()
+    model = (
+        AutoModelForCausalLM.from_pretrained(
+            model_id,
+            torch_dtype=dtype,
+            attn_implementation=attention,
+            **load_kwargs,
+        )
+        .to("cuda:0")
+        .eval()
+    )
     sync_cuda(torch)
     elapsed = time.perf_counter() - started
     parameter_devices = sorted({str(parameter.device) for parameter in model.parameters()})
@@ -1097,31 +1101,59 @@ def write_conclusion(path: Path, report: dict[str, Any]) -> None:
         and event.get("finite_ratio") is not None
         and event.get("finite_ratio") < 1.0
     }
+    fp32_finite = fp32.get("raw_forward", {}).get("final_position_all_finite") is True
+    fp32_status = fp32.get("generation", {}).get("status")
+    sdpa_finite = sdpa.get("raw_forward", {}).get("final_position_all_finite") is True
+    sdpa_status = sdpa.get("generation", {}).get("status")
+    reference_finite = reference.get("raw_forward", {}).get("final_position_all_finite") is True
+    reference_status = reference.get("generation", {}).get("status")
     lines = [
         "# GPU inference stability conclusion",
         "",
         f"- Job: `{report.get('job_id')}`",
-        f"- GPU: `{report.get('runtime', {}).get('gpu_name')}`, CC `{report.get('runtime', {}).get('compute_capability')}`",
+        f"- GPU: `{report.get('runtime', {}).get('gpu_name')}`, "
+        f"CC `{report.get('runtime', {}).get('compute_capability')}`",
         f"- Model: `{MODEL_ID}`, revision `{REVISION}`",
         "- Raw Transformers only; no Protocol, Agent, Base, SFT, or GRPO.",
         "",
         "## Acceptance answers",
         "",
-        f"1. FP32 normal: `{fp32.get('raw_forward', {}).get('final_position_all_finite') is True}`; generation status `{fp32.get('generation', {}).get('status')}`.",
-        f"2. FP16 eager first non-finite: `{first.get('name')}` (kind `{first.get('kind')}`), or `none`.",
+        (f"1. FP32 normal: `{fp32_finite}`; generation status `{fp32_status}`."),
+        (
+            f"2. FP16 eager first non-finite: `{first.get('name')}` "
+            f"(kind `{first.get('kind')}`), or `none`."
+        ),
         f"3. Attention QK/softmax involved: `{bool(qk_names)}`; events `{sorted(qk_names)}`.",
-        f"4. FP16 SDPA math-only normal: `{sdpa.get('raw_forward', {}).get('final_position_all_finite') is True}`; generation status `{sdpa.get('generation', {}).get('status')}`.",
-        f"5. FP32 attention-score accumulation normal: `{reference.get('raw_forward', {}).get('final_position_all_finite') is True}`; generation status `{reference.get('generation', {}).get('status')}`.",
-        "6. Recommended V100 path: FP16 weights with the finite path established by this run; do not treat FP32 as the final fix until the backend evidence is reviewed.",
-        "7. Put the finite-logit guard on the model output immediately before the generation sampling/greedy decision; this run uses a model forward hook and fails with `non_finite_logits`.",
+        (f"4. FP16 SDPA math-only normal: `{sdpa_finite}`; generation status `{sdpa_status}`."),
+        (
+            f"5. FP32 attention-score accumulation normal: `{reference_finite}`; "
+            f"generation status `{reference_status}`."
+        ),
+        (
+            "6. Recommended V100 path: FP16 weights with the finite path established by this run; "
+            "do not treat FP32 as the final fix until the backend evidence is reviewed."
+        ),
+        (
+            "7. Put the finite-logit guard on the model output immediately before the generation "
+            "sampling/greedy decision; this run uses a model forward hook and fails with "
+            "`non_finite_logits`."
+        ),
         "",
         "## Root-cause wording",
         "",
-        "The evidence tests the narrower hypothesis that Qwen2.5 BF16 checkpoint values overflow on the current V100 + PyTorch 2.2.2 + Transformers 4.46.3 FP16 execution path. It does not claim that FP16 is categorically invalid on Volta; Qwen recommends FP16 for Compute Capability below 8.0.",
+        (
+            "The evidence tests the narrower hypothesis that Qwen2.5 BF16 checkpoint "
+            "values overflow on the current V100 + PyTorch 2.2.2 + Transformers 4.46.3 "
+            "FP16 execution path. It does not claim that FP16 is categorically invalid on "
+            "Volta; Qwen recommends FP16 for Compute Capability below 8.0."
+        ),
         "",
         "## Performance boundary",
         "",
-        "Only finite-logit, semantically normal paths should be used as performance baselines. The previous 0.941 tok/s abnormal generation is not reused here.",
+        (
+            "Only finite-logit, semantically normal paths should be used as performance baselines. "
+            "The previous 0.941 tok/s abnormal generation is not reused here."
+        ),
     ]
     path.write_text("\n".join(lines) + "\n")
 
@@ -1220,10 +1252,14 @@ def main() -> int:
             local_files_only=True,
             trust_remote_code=False,
         )
-        inputs, chat_template_text, prompt_record = prepare_inputs(tokenizer, torch.device("cuda:0"))
+        inputs, chat_template_text, prompt_record = prepare_inputs(
+            tokenizer, torch.device("cuda:0")
+        )
         report["prompt_record"] = prompt_record
         report["chat_template_text"] = chat_template_text
-        write_json(args.output / "prompt.json", prompt_record | {"chat_template_text": chat_template_text})
+        write_json(
+            args.output / "prompt.json", prompt_record | {"chat_template_text": chat_template_text}
+        )
         prompt_token_count = prompt_record["prompt_token_count"]
 
         # A: FP32/eager reference.
@@ -1369,7 +1405,10 @@ def main() -> int:
         else:
             report["experiments"]["D_fp16_fp32_attention_scores"] = {
                 "status": "skipped",
-                "reason": "FP16 eager trace did not identify non-finite attention score or softmax tensors",
+                "reason": (
+                    "FP16 eager trace did not identify non-finite attention score or softmax "
+                    "tensors"
+                ),
             }
         write_json(
             args.output / "D-fp16-fp32-attention-scores.json",
@@ -1425,7 +1464,10 @@ def main() -> int:
                 "error": {
                     "type": type(exc).__name__,
                     "message": str(exc),
-                    "reason": "SDPA math-only API unavailable or execution failed; environment was not upgraded",
+                    "reason": (
+                        "SDPA math-only API unavailable or execution failed; "
+                        "environment was not upgraded"
+                    ),
                 },
             }
         report["experiments"]["C_fp16_sdpa_math"] = sdpa_result

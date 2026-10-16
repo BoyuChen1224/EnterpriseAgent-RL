@@ -51,6 +51,6 @@ CPU runtime 不依赖 Torch、Transformers、LangGraph 或任何训练框架。�
 
 Qwen 官方模型卡说明 Transformers <4.37 无法识别 qwen2，且示例使用 `torch_dtype='auto'`。本项目后续必须显式指定 FP16，不能根据权重默认精度推断 Volta 支持。来源：[Qwen2.5-1.5B-Instruct 模型卡](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)。
 
-V100 路径优先 Transformers `attn_implementation='eager'`，后续再验证其他后端。FlashAttention-2 的 CUDA 路径对 GPU 架构有要求，不能默认用于 Volta；见 [官方项目](https://github.com/Dao-AILab/flash-attention)。同时本次检查了 verl v0.4.1 源码中的 FlashAttention-2/BF16 默认值，因此不直接安装其完整 requirements，详见 `docs/upstream-research.md`。
+上一阶段曾将 V100 路径暂定为 Transformers `attn_implementation='eager'`，Job 20385898 已证明 FP16 eager 存在 QK overflow；当前生产路径改为 `attention_backend='sdpa_math'`，并由 Runtime 局部强制 SDPA math。FlashAttention-2 的 CUDA 路径对 GPU 架构有要求，不能默认用于 Volta；见 [官方项目](https://github.com/Dao-AILab/flash-attention)。同时本次检查了 verl v0.4.1 源码中的 FlashAttention-2/BF16 默认值，因此不直接安装其完整 requirements，详见 `docs/upstream-research.md`。
 
 下一阶段先采集真实驱动、显存、CC、编译架构和容器运行情况，再决定 CUDA wheel、Python 版本、编译器、SFT 与 GRPO 后端。当前没有任何 GPU 显存、吞吐、训练稳定性或能力提升实测数据。

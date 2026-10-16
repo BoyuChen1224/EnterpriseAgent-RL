@@ -40,7 +40,7 @@ M2B 更新（2026-10-16）：固定 revision 的完整 snapshot 已在非 GPU �
 
 采用独立 `.venv-gpu`、Torch 2.2.2（CUDA 12.1 wheel）、Transformers 4.46.3、NumPy 1.26.4、tokenizers 0.20.3、safetensors 0.4.5。完整版本见 `requirements/gpu-py312-linux.lock`；CPU `.venv` 与原锁文件保留。CUDA 12.1 wheel 的候选选择参考 [PyTorch 官方历史版本](https://pytorch.org/get-started/previous-versions/)。驱动能否运行该组合仍须计算节点实测；若不兼容，先按审计结果建立另一份锁，不升级系统驱动。
 
-上游模型配置标为 BF16，服务不使用 `torch_dtype="auto"`，而是显式 `torch.float16`；attention 固定 eager，加载后校验实际 dtype 与 attention。Qwen2 已包含于固定 Transformers 版本，见 [官方 Qwen2 文档](https://huggingface.co/docs/transformers/v4.46.3/en/model_doc/qwen2)。没有启用 BF16、FlashAttention-2、vLLM、verl 或自定义新架构算子，也没有做训练。以上是实现选择，不是 V100 通过结论。
+上游模型配置标为 BF16，服务不使用 `torch_dtype="auto"`，而是显式 `torch.float16`；生产 Runtime 使用 `attention_backend="sdpa_math"`，映射到官方 `attn_implementation="sdpa"`，并在每次生成中强制 SDPA math。FP16 eager 仅保留为诊断对照，FP32 attention-score accumulation 仅保留为 research/debug reference。Qwen2 已包含于固定 Transformers 版本，见 [官方 Qwen2 文档](https://huggingface.co/docs/transformers/v4.46.3/en/model_doc/qwen2)。没有启用 BF16、FlashAttention-2、vLLM、verl 或自定义新架构算子，也没有做训练。Job 20385898 的根因和生产集成说明见 [V100 inference stability](v100-inference-stability.md)；代码集成后的 GPU 验收仍需单独执行。
 
 ## 授权后的运行顺序
 
