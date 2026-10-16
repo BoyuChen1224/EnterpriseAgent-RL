@@ -66,7 +66,9 @@ SQL_ERROR_PATTERNS = (
     "incomplete input",
     "misuse of",
     "near ",
+    "unrecognized token",
 )
+ACTION_BUDGET_ERRORS = {"action_budget_exhausted", "tool_budget_exhausted"}
 
 
 def _dump(value: Any) -> Any:
@@ -360,7 +362,12 @@ def _sql_error_type(error: str) -> str:
         return "no_such_column"
     if "no such table" in text:
         return "no_such_table"
-    if "syntax error" in text or "near " in text or "incomplete input" in text:
+    if (
+        "syntax error" in text
+        or "near " in text
+        or "incomplete input" in text
+        or "unrecognized token" in text
+    ):
         return "syntax_error"
     if "ambiguous" in text:
         return "ambiguous_column"
@@ -369,6 +376,19 @@ def _sql_error_type(error: str) -> str:
     if "wrong filter" in text:
         return "wrong_filter"
     return "other_sql_error"
+
+
+def _planning_error_counts(trajectory: Trajectory) -> dict[str, int]:
+    counts = Counter()
+    for attempt in trajectory.model_attempts:
+        error = attempt.get("error")
+        if error in {"invalid_json", "empty_output"}:
+            counts["action_format_error"] += 1
+        elif error == "invalid_action":
+            counts["unknown_tool_or_action"] += 1
+        elif error == "invalid_action_arguments":
+            counts["invalid_tool_arguments"] += 1
+    return dict(sorted(counts.items()))
 
 
 def _recovery(trajectory: Trajectory) -> dict[str, Any]:
@@ -459,7 +479,11 @@ def _task_result(
             attempt.get("telemetry", {}).get("non_finite_logits_detected", False)
             for attempt in attempts
         )
-    sql_errors = [str(step.tool_result.error) for step in sql_steps if not step.tool_result.ok]
+    sql_errors = [
+        str(step.tool_result.error)
+        for step in sql_steps
+        if not step.tool_result.ok and step.tool_result.error not in ACTION_BUDGET_ERRORS
+    ]
     sql_error_types = Counter(_sql_error_type(error) for error in sql_errors)
     invalid_outputs = sum(
         str(attempt.get("error", "")) in BUSINESS_ERROR_CODES for attempt in attempts
@@ -533,6 +557,7 @@ def _task_result(
         "first_sql_failure": bool(sql_steps and not sql_steps[0].tool_result.ok),
         "sql_error_types": dict(sorted(sql_error_types.items())),
         "sql_error_messages": sql_errors,
+        "planning_errors": _planning_error_counts(trajectory) if trajectory else {},
         "tool_selection": dict(sorted(tool_selection.items())),
         "recovery_count": recovery["recovery_count"],
         "recovery_status": recovery["recovery_status"],
@@ -605,16 +630,19 @@ def _failure_analysis(
     sql_error_types = Counter()
     tool_selection = Counter()
     recovery = Counter()
+    planning_errors = Counter()
     for item in results:
         sql_error_types.update(item.get("sql_error_types", {}))
         tool_selection.update(item.get("tool_selection", {}))
         recovery.update([item.get("recovery_status", "unknown")])
+        planning_errors.update(item.get("planning_errors", {}))
     return {
         "category_counts": category_counts,
         "business_failures": business_failures,
         "infrastructure_failures": len(infrastructure_failures),
         "top_failure_modes": top,
         "sql_error_type_distribution": dict(sorted(sql_error_types.items())),
+        "planning_error_distribution": dict(sorted(planning_errors.items())),
         "tool_selection_distribution": dict(sorted(tool_selection.items())),
         "recovery_outcomes": dict(sorted(recovery.items())),
         "infrastructure_failure_details": infrastructure_failures,
@@ -1073,6 +1101,28 @@ def repair_existing_report(output: Path) -> dict[str, Any]:
     results = []
     for path in sorted(output.glob("task-*-result.json")):
         result = json.loads(path.read_text())
+        trajectory = None
+        for trajectory_key in ("trajectory_path", "raw_trajectory_path"):
+            trajectory_name = result.get(trajectory_key)
+            if not trajectory_name:
+                continue
+            trajectory_file = output / trajectory_name
+            if trajectory_file.is_file():
+                trajectory = TrajectoryStore.load(trajectory_file)
+                break
+        if trajectory is not None:
+            sql_errors = [
+                str(step.tool_result.error)
+                for step in trajectory.steps
+                if step.tool_name == "sql"
+                and not step.tool_result.ok
+                and step.tool_result.error not in ACTION_BUDGET_ERRORS
+            ]
+            result["sql_error_messages"] = sql_errors
+            result["sql_error_types"] = dict(
+                sorted(Counter(_sql_error_type(error) for error in sql_errors).items())
+            )
+            result["planning_errors"] = _planning_error_counts(trajectory)
         reason = str(result.get("failure_reason") or "").lower()
         if result.get("failure_category") != "Infrastructure Failure":
             if "budget_exhausted" in reason or "tool_budget" in reason:
@@ -1081,6 +1131,10 @@ def repair_existing_report(output: Path) -> dict[str, Any]:
                 result["failure_category"] = "Invalid Action"
         _write_json(path, result)
         results.append(result)
+    original_order = {
+        item.get("task_id"): index for index, item in enumerate(report.get("episodes", []))
+    }
+    results.sort(key=lambda item: original_order.get(item.get("task_id"), len(original_order)))
     details = report.get("failure_analysis", {}).get("infrastructure_failure_details", [])
     analysis = _failure_analysis(results, details)
     report["episodes"] = results
