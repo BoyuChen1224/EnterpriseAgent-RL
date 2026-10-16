@@ -14,6 +14,7 @@ import urllib.request
 from pathlib import Path
 
 from enterprise_agent_rl.agent import LocalModelPolicy, run_episode
+from enterprise_agent_rl.base_benchmark import run_base_benchmark, write_incomplete_report
 from enterprise_agent_rl.base_evaluation import evaluate_suite
 from enterprise_agent_rl.common import Settings
 from enterprise_agent_rl.data import benchmark_tasks, initialize_database
@@ -85,7 +86,7 @@ def run_protocol_smoke(policy: LocalModelPolicy, settings: Settings, output: Pat
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["single", "protocol", "agent", "base"])
+    parser.add_argument("mode", choices=["single", "protocol", "agent", "base", "base-benchmark"])
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
@@ -234,7 +235,7 @@ def main():
                     metadata["acceptance"]["agent_capability_smoke"] = "business_failed"
                 else:
                     metadata["acceptance"]["agent_capability_smoke"] = "incomplete_verification"
-            else:
+            elif args.mode == "base":
                 report = evaluate_suite(
                     policy,
                     args.manifest,
@@ -246,8 +247,34 @@ def main():
                 metadata["acceptance"]["base_validation"] = (
                     "complete" if report["complete"] else "incomplete_verification"
                 )
+            else:
+                report = run_base_benchmark(
+                    policy,
+                    args.manifest,
+                    args.database_root,
+                    settings,
+                    cfg,
+                    args.output.parent,
+                    runtime_metadata=metadata.get("model_load"),
+                )
+                metadata["acceptance"]["base_validation"] = report["status"]
         metadata["status"] = "completed"
     except BaseException as exc:
+        if args.mode == "base-benchmark":
+            try:
+                write_incomplete_report(
+                    args.output.parent,
+                    args.manifest,
+                    args.database_root,
+                    cfg,
+                    settings,
+                    {"type": type(exc).__name__, "message": str(exc)},
+                )
+            except Exception as report_exc:
+                metadata["benchmark_finalize_error"] = {
+                    "type": type(report_exc).__name__,
+                    "message": str(report_exc),
+                }
         metadata["acceptance"]["infrastructure_smoke"] = (
             "failed"
             if metadata["acceptance"]["infrastructure_smoke"]
