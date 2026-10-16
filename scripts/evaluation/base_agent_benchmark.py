@@ -10,6 +10,7 @@ from pathlib import Path
 from enterprise_agent_rl.base_benchmark import (
     EXPECTED_SPLIT_COUNTS,
     prepare_validation_plan,
+    repair_existing_report,
     write_incomplete_report,
 )
 from enterprise_agent_rl.common import Settings
@@ -28,11 +29,18 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--finalize-incomplete", action="store_true")
+    parser.add_argument("--repair-report", action="store_true")
     parser.add_argument("--error-type", default="supervisor_failure")
     parser.add_argument("--error-message", default="benchmark supervisor exited before completion")
     args = parser.parse_args()
     if args.split != "validation":
         raise SystemExit("base benchmark is validation-only; refusing non-validation split")
+    if args.repair_report:
+        if args.output is None:
+            raise SystemExit("--output is required with --repair-report")
+        report = repair_existing_report(args.output)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
     if args.finalize_incomplete:
         if args.output is None:
             raise SystemExit("--output is required with --finalize-incomplete")

@@ -122,7 +122,7 @@ def _scheduler_fields() -> dict[str, Any]:
             "account": r"Account=([^\s]+)",
             "partition": r"Partition=([^\s]+)",
             "qos": r"QOS=([^\s]+)",
-            "node": r"NodeList=([^\s]+)",
+            "node": r"(?:^|\s)NodeList=([^\s]+)",
             "state": r"JobState=([^\s]+)",
             "exit_code": r"ExitCode=([^\s]+)",
             "elapsed": r"RunTime=([^\s]+)",
@@ -475,10 +475,10 @@ def _task_result(
             reward.reason if reward is not None else terminal_reason
         ) or terminal_reason
         lower_reason = str(failure_reason).lower()
-        if "invalid_action" in lower_reason or invalid_outputs:
-            category = "Invalid Action"
-        elif "budget_exhausted" in lower_reason or "tool_budget" in lower_reason:
+        if "budget_exhausted" in lower_reason or "tool_budget" in lower_reason:
             category = "Action Budget Exhausted"
+        elif "invalid_action" in lower_reason or invalid_outputs:
+            category = "Invalid Action"
         elif sql_errors and recovery["recovery_status"] in {
             "unsuccessful_recovery",
             "repeated_recovery_loop",
@@ -1063,4 +1063,44 @@ def write_incomplete_report(
         infrastructure_failure_count=len(infrastructure),
         finished_at_utc=_now(),
     )
+    return report
+
+
+def repair_existing_report(output: Path) -> dict[str, Any]:
+    """Recompute business failure labels from already saved task results."""
+    report_path = output / "benchmark-report.json"
+    report = json.loads(report_path.read_text())
+    results = []
+    for path in sorted(output.glob("task-*-result.json")):
+        result = json.loads(path.read_text())
+        reason = str(result.get("failure_reason") or "").lower()
+        if result.get("failure_category") != "Infrastructure Failure":
+            if "budget_exhausted" in reason or "tool_budget" in reason:
+                result["failure_category"] = "Action Budget Exhausted"
+            elif "invalid_action" in reason or result.get("invalid_action_count", 0):
+                result["failure_category"] = "Invalid Action"
+        _write_json(path, result)
+        results.append(result)
+    details = report.get("failure_analysis", {}).get("infrastructure_failure_details", [])
+    analysis = _failure_analysis(results, details)
+    report["episodes"] = results
+    report["failure_analysis"] = analysis
+    report["business_failures"] = analysis["business_failures"]
+    report["infrastructure_failures"] = analysis["infrastructure_failures"]
+    report["failure_trajectories"] = [
+        item for item in results if item.get("failure_category") != "Successful"
+    ]
+    _write_json(
+        output / "summary.json",
+        {
+            "status": report.get("status"),
+            "task_count": report.get("task_count"),
+            "completed_task_count": len(results),
+            "business_failures": analysis["business_failures"],
+            "infrastructure_failures": analysis["infrastructure_failures"],
+            "top_failure_modes": analysis["top_failure_modes"],
+            "metrics": report.get("metrics", {}),
+        },
+    )
+    _write_json(report_path, report)
     return report
