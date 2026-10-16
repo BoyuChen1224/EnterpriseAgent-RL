@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
-  "frozen_at": "2026-10-16T01:59:19.929060+00:00",
+  "frozen_at": "2026-10-16T02:05:05.865161+00:00",
   "git": {
-    "commit": "6a4155bbfbb8fc518aee2850f03c2535bd49bae7",
-    "dirty": true
+    "commit": "cf108e23dac53765dcd0d220c185a7d097a084eb",
+    "dirty": false
   },
   "python": "3.12.7 | packaged by Anaconda, Inc. | (main, Oct  4 2024, 13:27:36) [GCC 11.2.0]",
   "model": {
@@ -52,7 +52,17 @@
   },
   "dependencies": {
     "cpu_lock_sha256": "18b4f096b23521ae3b8ada3aec4c1031e66ada5f69006c676e7cddd8642f2473",
-    "gpu_lock_sha256": "38d3d4f09ba58ef0a98054f937ed8b70c8657566d5459bc3aa09412a0c7a4058"
+    "gpu_lock_sha256": "38d3d4f09ba58ef0a98054f937ed8b70c8657566d5459bc3aa09412a0c7a4058",
+    "installed_versions": {
+      "torch": "2.2.2",
+      "transformers": "4.46.3",
+      "tokenizers": "0.20.3",
+      "safetensors": "0.4.5",
+      "numpy": "1.26.4",
+      "pydantic": "2.10.6",
+      "fastapi": "0.115.6",
+      "uvicorn": "0.34.0"
+    }
   },
   "gpu_authorization": {
     "status": "not_granted",
