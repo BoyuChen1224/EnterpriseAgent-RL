@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0",
+  "frozen_at": "2026-10-16T01:59:19.929060+00:00",
+  "git": {
+    "commit": "6a4155bbfbb8fc518aee2850f03c2535bd49bae7",
+    "dirty": true
+  },
+  "python": "3.12.7 | packaged by Anaconda, Inc. | (main, Oct  4 2024, 13:27:36) [GCC 11.2.0]",
+  "model": {
+    "id": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "dtype": "float16",
+    "attention": "eager",
+    "config_sha256": "acb3888b47c39bc1341850eedfad7f33656600e2372fd05a7ba02e621994d2ae"
+  },
+  "generation": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_tokens": 512,
+    "format_retries": 1,
+    "parse_mode": "json_fence",
+    "seed": 17
+  },
+  "agent": {
+    "seed": 17,
+    "max_actions": 20,
+    "max_tool_calls": 14,
+    "episode_timeout_s": 600.0,
+    "inference_timeout_s": 120.0,
+    "sql_timeout_s": 2.0,
+    "sql_max_rows": 100,
+    "sql_max_bytes": 65536,
+    "sql_memory_mb": 256,
+    "step_penalty": 0,
+    "repeat_penalty": 0,
+    "error_penalty": 0,
+    "recovery_bonus": 0,
+    "token_price_per_million": 0,
+    "tool_price": 0
+  },
+  "prompt_contract": {
+    "system_prompt_source": "src/enterprise_agent_rl/agent.py:SYSTEM_PROMPT",
+    "protocol_source": "src/enterprise_agent_rl/model_protocol.py",
+    "local_files_only": true
+  },
+  "benchmark": {
+    "manifest": "benchmarks/m2a/manifest.json",
+    "manifest_sha256": "232ed8b69cdf8ba9a63d40413ae96794e00b22f339bb3f5041acf3dd71a67a0d",
+    "validation_split": 20,
+    "test_split": 20,
+    "test_policy": "not_started; freeze before formal test"
+  },
+  "dependencies": {
+    "cpu_lock_sha256": "18b4f096b23521ae3b8ada3aec4c1031e66ada5f69006c676e7cddd8642f2473",
+    "gpu_lock_sha256": "38d3d4f09ba58ef0a98054f937ed8b70c8657566d5459bc3aa09412a0c7a4058"
+  },
+  "gpu_authorization": {
+    "status": "not_granted",
+    "submitted_jobs": [],
+    "gpu_tests": "pending"
+  }
+}

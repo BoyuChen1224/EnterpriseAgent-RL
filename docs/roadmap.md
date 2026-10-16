@@ -6,6 +6,10 @@
 
 已在 `dev/qwen-base-inference` 实现固定 Qwen revision 的 FP16/eager 服务、原始动作审计、独立推理预算、冻结 60 任务及 Slurm 运行入口。真实 GPU 和 Base 评测等待收费授权，具体完成/待验收边界见 [M2A](milestone-2a.md) 与 [V100](v100-compatibility.md)。本轮不开展 SFT/GRPO。
 
+## M2B 真实推理验收入口
+
+从 `dev/qwen-base-inference@6a4155b` 创建的 `dev/gpu-baseline` 先完成固定 revision 缓存、逐文件完整性校验、实验配置冻结、Slurm 预检和 train-only 专家轨迹审计。真实验收分为 Infrastructure Smoke、Protocol Smoke、Agent Capability Smoke 和 validation Base report；收费 GPU 未获授权时全部 GPU 结果保持 Pending。详细证据口径见 [M2B](milestone-2b.md)。
+
 ## M2：设备审计与最小兼容闭环
 
 1. 从 `docs/environment-audit.md` 复核用户政策、个人存储 quota、可选 GPU 账户/QOS。仅在获得用户新的明确收费授权后，选择单卡 gpu2Q、显式短时限，先提交已准备的 `scripts/slurm/gpu_inventory.sbatch`。不要在登录节点运行 nvidia-smi 推理/模型加载，不使用八卡长期作业。

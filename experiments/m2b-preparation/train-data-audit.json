@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "source": "deterministic_fixture_expert",
+  "llm_capability_result": false,
+  "reference_answers_in_model_context": false,
+  "tool_execution_and_independent_verification": true,
+  "scheduled_tasks": 20,
+  "verified_trajectories": 20,
+  "successful_trajectories": 6,
+  "failed_trajectories": 14,
+  "failure_types": {
+    "incorrect_result": 2,
+    "policy_or_runtime_error:ValueError": 12,
+    "success": 6
+  },
+  "task_templates": [
+    "category",
+    "constraints",
+    "customer",
+    "empty",
+    "inactive",
+    "product",
+    "recovery",
+    "region",
+    "schema",
+    "top"
+  ],
+  "task_template_count": 10,
+  "database_count": 2,
+  "action_sequence_count": 3,
+  "tool_sequence_count": 3,
+  "average_steps": 4.3,
+  "average_tool_calls": 2.9,
+  "evaluation_report": "artifacts/m2b-train-audit/report.json",
+  "recommendation": "The 20 train tasks can yield verified fixture expert traces, but are too small for strong generalization. Expand databases, schemas, business templates, recovery and negative traces before SFT/GRPO; keep Base trajectories and expert traces distinct."
+}

@@ -1,0 +1,25 @@
+Slurm validation mode: --test-only (no jobs submitted; IDs below are scheduler dry-run IDs only)
+Candidate account: pi_daipeishan
+Candidate QOS: gpuq
+
+scripts/slurm/gpu_inventory.sbatch
+  exit=0
+  sbatch: Job 20385174 to start at 2884-03-27T07:16:13 using 1 processors on nodes gpu207 in partition gpu2Q
+
+scripts/slurm/qwen_single.sbatch
+  exit=0
+  sbatch: Job 20385178 to start at 2884-03-27T07:16:13 using 2 processors on nodes gpu207 in partition gpu2Q
+
+scripts/slurm/qwen_protocol.sbatch
+  exit=0
+  sbatch: Job 20385175 to start at 2884-03-27T07:16:13 using 2 processors on nodes gpu207 in partition gpu2Q
+
+scripts/slurm/qwen_agent.sbatch
+  exit=0
+  sbatch: Job 20385176 to start at 2884-03-27T07:16:13 using 2 processors on nodes gpu207 in partition gpu2Q
+
+scripts/slurm/qwen_base.sbatch
+  exit=0
+  sbatch: Job 20385177 to start at 2884-03-27T07:16:13 using 2 processors on nodes gpu207 in partition gpu2Q
+
+These are not actual job IDs and must not be reported as executed GPU work.

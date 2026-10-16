@@ -13,13 +13,15 @@ import time
 import urllib.request
 from pathlib import Path
 
-from enterprise_agent_rl.agent import LocalModelPolicy
+from enterprise_agent_rl.agent import LocalModelPolicy, run_episode
 from enterprise_agent_rl.base_evaluation import evaluate_suite
 from enterprise_agent_rl.common import Settings
 from enterprise_agent_rl.data import benchmark_tasks, initialize_database
 from enterprise_agent_rl.evaluation import evaluate
 from enterprise_agent_rl.gpu_guard import require_compute_node
 from enterprise_agent_rl.model_server import ModelSettings
+from enterprise_agent_rl.rewards import verify
+from enterprise_agent_rl.trajectories import TrajectoryStore
 
 
 def stop_model_process(process):
@@ -33,9 +35,57 @@ def stop_model_process(process):
             process.wait(timeout=5)
 
 
+def write_json(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+
+
+def run_protocol_smoke(policy: LocalModelPolicy, settings: Settings, output: Path) -> dict:
+    """Exercise real model JSON parsing and at least one real environment tool call."""
+    output.mkdir(parents=True, exist_ok=True)
+    database = initialize_database(output / "protocol.sqlite3")
+    task = next(t for t in benchmark_tasks() if t.public.task_id == "top-2025")
+    trajectory = run_episode(task.public, policy, database, settings, output / "sql-audit.jsonl")
+    store = TrajectoryStore(output / "trajectories")
+    path = store.save(trajectory)
+    verification = None
+    verification_error = None
+    try:
+        reward = verify(task, trajectory, database)
+        trajectory = trajectory.model_copy(update={"reward": reward})
+        path = store.save(trajectory)
+        verification = reward.model_dump()
+    except Exception as exc:
+        verification_error = {"type": type(exc).__name__, "message": str(exc)}
+    outputs = [a for a in trajectory.model_attempts if a.get("raw_output") is not None]
+    valid_outputs = [a for a in outputs if a.get("format_valid")]
+    tool_steps = [step for step in trajectory.steps if step.tool_name]
+    report = {
+        "schema_version": "1.0",
+        "acceptance_layer": "protocol_smoke",
+        "policy_kind": policy.kind,
+        "policy_version": policy.version,
+        "task_id": task.public.task_id,
+        "model_outputs": len(outputs),
+        "action_format_validity_rate": len(valid_outputs) / len(outputs) if outputs else None,
+        "protocol_action_generated": bool(valid_outputs),
+        "real_tool_call_executed": bool(tool_steps),
+        "real_tool_call_observed": bool(
+            tool_steps and all(step.tool_result is not None for step in tool_steps)
+        ),
+        "protocol_smoke_passed": bool(valid_outputs and tool_steps),
+        "business_reward": verification,
+        "verification_error": verification_error,
+        "trajectory_path": str(path.relative_to(output)),
+        "business_capability_not_inferred": True,
+    }
+    write_json(output / "report.json", report)
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["single", "agent", "base"])
+    parser.add_argument("mode", choices=["single", "protocol", "agent", "base"])
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
@@ -65,6 +115,12 @@ def main():
         "node": socket.gethostname(),
         "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
         "git_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"])),
+        "acceptance": {
+            "infrastructure_smoke": "pending",
+            "protocol_smoke": "not_run",
+            "agent_capability_smoke": "not_run",
+            "base_validation": "not_run",
+        },
     }
     metadata_path = args.output / "execution.json"
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
@@ -121,6 +177,7 @@ def main():
                     raise TimeoutError("model_server_startup_timeout") from None
                 time.sleep(0.5)
         metadata["status"] = "running"
+        metadata["acceptance"]["infrastructure_smoke"] = "model_loaded_http_ready"
         metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
         if args.mode == "single":
             request = urllib.request.Request(
@@ -141,11 +198,25 @@ def main():
             )
             with opener.open(request, timeout=settings.inference_timeout_s + 2) as response:
                 result = json.load(response)
-            (args.output / "single-generation.json").write_text(
-                json.dumps(result, ensure_ascii=False, indent=2) + "\n"
+            write_json(args.output / "single-generation.json", result)
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            infrastructure_passed = bool(isinstance(content, str) and content.strip())
+            metadata["acceptance"]["infrastructure_smoke"] = (
+                "passed" if infrastructure_passed else "failed_empty_generation"
             )
-            if not result["choices"][0]["message"]["content"].strip():
+            if not infrastructure_passed:
                 raise RuntimeError("empty_output")
+        elif args.mode == "protocol":
+            policy = LocalModelPolicy(
+                endpoint + "/v1/chat/completions",
+                cfg.model_id,
+                "qwen-base-" + cfg.revision[:12],
+                cfg.generation,
+            )
+            protocol = run_protocol_smoke(policy, settings, args.output / "protocol")
+            metadata["acceptance"]["protocol_smoke"] = (
+                "passed" if protocol["protocol_smoke_passed"] else "failed_protocol_contract"
+            )
         else:
             policy = LocalModelPolicy(
                 endpoint + "/v1/chat/completions",
@@ -157,8 +228,12 @@ def main():
                 db = initialize_database(args.output / "smoke.sqlite3")
                 tasks = [t for t in benchmark_tasks() if t.public.task_id == "top-2025"]
                 report = evaluate(policy, tasks, db, settings, args.output / "smoke")
-                if report["metrics"]["task_success_rate"] != 1:
-                    raise RuntimeError("agent_smoke_task_failed:see_real_trajectory")
+                if report["complete"] and report["metrics"]["task_success_rate"] == 1:
+                    metadata["acceptance"]["agent_capability_smoke"] = "passed"
+                elif report["complete"]:
+                    metadata["acceptance"]["agent_capability_smoke"] = "business_failed"
+                else:
+                    metadata["acceptance"]["agent_capability_smoke"] = "incomplete_verification"
             else:
                 report = evaluate_suite(
                     policy,
@@ -168,10 +243,17 @@ def main():
                     settings,
                     args.output / "base",
                 )
-                if not report["complete"]:
-                    raise RuntimeError("incomplete_base_evaluation:see_verification_errors")
+                metadata["acceptance"]["base_validation"] = (
+                    "complete" if report["complete"] else "incomplete_verification"
+                )
         metadata["status"] = "completed"
     except BaseException as exc:
+        metadata["acceptance"]["infrastructure_smoke"] = (
+            "failed"
+            if metadata["acceptance"]["infrastructure_smoke"]
+            in {"pending", "model_loaded_http_ready"}
+            else metadata["acceptance"]["infrastructure_smoke"]
+        )
         metadata.update(status="failed", error={"type": type(exc).__name__, "message": str(exc)})
         raise
     finally:
@@ -180,7 +262,11 @@ def main():
             metadata["server_exit_code"] = process.returncode
         log.close()
         metadata["server_cleaned_up"] = process is None or process.poll() is not None
+        metadata["acceptance"]["resource_recovery"] = (
+            "passed" if metadata["server_cleaned_up"] else "failed"
+        )
         metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
+        write_json(args.output / "acceptance.json", metadata)
 
 
 if __name__ == "__main__":

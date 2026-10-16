@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import json
 import os
 import threading
@@ -68,6 +69,16 @@ class QwenEngine:
         self.torch, self.cfg = torch, cfg
         self.events = output / "generations.jsonl"
         output.mkdir(parents=True, exist_ok=True)
+        manifest_path = cache / "qwen-cache-manifest.json"
+        if not manifest_path.is_file():
+            raise RuntimeError("cache_integrity_manifest_missing")
+        cache_manifest = json.loads(manifest_path.read_text())
+        if (
+            cache_manifest.get("model") != cfg.model_id
+            or cache_manifest.get("revision") != cfg.revision
+            or not cache_manifest.get("weight_files")
+        ):
+            raise RuntimeError("cache_integrity_manifest_mismatch")
         if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
             raise RuntimeError("requires_one_visible_cuda_device")
         capability = torch.cuda.get_device_capability(0)
@@ -119,6 +130,13 @@ class QwenEngine:
             "load_latency_s": time.monotonic() - started,
             "load_peak_allocated_bytes": torch.cuda.max_memory_allocated(),
             "load_peak_reserved_bytes": torch.cuda.max_memory_reserved(),
+            "cache_manifest": {
+                "path": str(manifest_path),
+                "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                "size_bytes": manifest_path.stat().st_size,
+                "cache_size_bytes_unique": cache_manifest.get("cache_size_bytes_unique"),
+                "integrity": cache_manifest.get("integrity"),
+            },
         }
         (output / "model-load.json").write_text(json.dumps(self.metadata, indent=2) + "\n")
 

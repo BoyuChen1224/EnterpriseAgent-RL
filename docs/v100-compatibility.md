@@ -4,6 +4,8 @@
 
 **GPU 验收 Pending。用户尚未授权收费 GPU 作业，本阶段没有提交 gpu2Q 作业，没有加载 Qwen，没有真实模型推理或训练结果。** 下表中的 Pending 不能视为通过。
 
+M2B 更新（2026-10-16）：固定 revision 的完整 snapshot 已在非 GPU 环境续传完成，并通过逐文件 SHA-256 校验；缓存证据见 [M2B](milestone-2b.md)。这只解除下载准备阻塞，不改变下列设备、驱动、显存、FP16/eager 加载和真实 Agent 结果的 Pending 状态。
+
 ## 已实测的登录节点元数据
 
 | 项目 | 结果 | 证据/边界 |

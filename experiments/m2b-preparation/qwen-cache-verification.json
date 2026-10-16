@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "status": "complete",
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "dtype": "float16",
+  "attention": "eager",
+  "cache": "artifacts/model-cache",
+  "snapshot": "artifacts/model-cache/models--Qwen--Qwen2.5-1.5B-Instruct/snapshots/989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "required_files_missing": [],
+  "weight_files": [
+    "model.safetensors"
+  ],
+  "incomplete_blobs": [],
+  "files": {
+    "LICENSE": {
+      "bytes": 11343,
+      "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+      "target": "/public/home/hpc204166/chenboyu/EnterpriseAgent-RL/artifacts/model-cache/models--Qwen--Qwen2.5-1.5B-Instruct/blobs/6634c8cc3133b3848ec74b9f275acaaa1ea618ab"
+    },
+    "config.json": {
+      "bytes": 660,
+      "sha256": "98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670",
+      "target": "/public/home/hpc204166/chenboyu/EnterpriseAgent-RL/artifacts/model-cache/models--Qwen--Qwen2.5-1.5B-Instruct/blobs/f81ead14ab072d65a07817f83a3ee0e5a1890d10"
+    },
+    "generation_config.json": {
+      "bytes": 242,
+      "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6",
+      "target": "/public/home/hpc204166/chenboyu/EnterpriseAgent-RL/artifacts/model-cache/models--Qwen--Qwen2.5-1.5B-Instruct/blobs/dfc11073787daf1b0f9c0f1499487ab5f4c93738"
+    },
+    "merges.txt": {
+      "bytes": 1671839,
+      "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+      "target": "/public/home/hpc204166/chenboyu/EnterpriseAgent-RL/artifacts/model-cache/models--Qwen--Qwen2.5-1.5B-Instruct/blobs/20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+    },
+    "model.safetensors": {
+      "bytes": 3087467144,
+      "sha256": "dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee",
+      "target": "/public/home/hpc204166/chenboyu/EnterpriseAgent-RL/artifacts/model-cache/models--Qwen--Qwen2.5-1.5B-Instruct/blobs/dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee"
+    },
+    "tokenizer.json": {
+      "bytes": 7031645,
+      "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+      "target": "/public/home/hpc204166/chenboyu/EnterpriseAgent-RL/artifacts/model-cache/models--Qwen--Qwen2.5-1.5B-Instruct/blobs/443909a61d429dff23010e5bddd28ff530edda00"
+    },
+    "tokenizer_config.json": {
+      "bytes": 7305,
+      "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+      "target": "/public/home/hpc204166/chenboyu/EnterpriseAgent-RL/artifacts/model-cache/models--Qwen--Qwen2.5-1.5B-Instruct/blobs/07bfe0640cb5a0037f9322287fbfc682806cf672"
+    },
+    "vocab.json": {
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+      "target": "/public/home/hpc204166/chenboyu/EnterpriseAgent-RL/artifacts/model-cache/models--Qwen--Qwen2.5-1.5B-Instruct/blobs/4783fe10ac3adce15ac8f358ef5462739852c569"
+    }
+  },
+  "manifest_path": "artifacts/model-cache/qwen-cache-manifest.json",
+  "manifest_matches": true,
+  "cache_size_bytes_unique": 3098967011,
+  "integrity": "sha256-per-snapshot-file"
+}

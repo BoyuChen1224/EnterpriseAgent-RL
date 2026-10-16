@@ -28,10 +28,27 @@ def evaluate_suite(
     records = [r for r in frozen["records"] if r["task"]["split"] == split]
     store = TrajectoryStore(output / "trajectories")
     trajectories, verification_errors = [], []
+    episode_records = []
+
+    def _metrics() -> dict | None:
+        if not trajectories:
+            return None
+        metrics = summarize(trajectories, settings, allow_multiple_databases=True)
+        scored_successes = sum(bool(t.reward and t.reward.success) for t in trajectories)
+        metrics.update(
+            task_success_rate_scored=metrics["task_success_rate"],
+            task_success_rate=scored_successes / len(records) if records else None,
+            task_success_denominator=len(records),
+            scored_task_successes=scored_successes,
+            verifier_success_rate=len(trajectories) / len(records) if records else None,
+            verifier_error_count=len(verification_errors),
+        )
+        return metrics
 
     def write_report():
+        metrics = _metrics()
         report = {
-            "schema_version": "1.1",
+            "schema_version": "1.2",
             "split": split,
             "manifest_sha256": frozen["manifest_sha256"],
             "database_fingerprint_kind": frozen["database_fingerprint_kind"],
@@ -40,21 +57,19 @@ def evaluate_suite(
             "settings": settings.model_dump(),
             "scheduled_episodes": len(records),
             "scored_episodes": len(trajectories),
-            "metrics_scope": "scored episodes; inspect complete before using as a baseline",
+            "metrics_scope": (
+                "task_success_rate uses all scheduled episodes as denominator; other aggregate "
+                "execution metrics use scored episodes; incomplete if verifier errors exist"
+            ),
             "verification_errors": verification_errors,
-            "metrics": summarize(trajectories, settings, allow_multiple_databases=True)
-            if trajectories
-            else None,
+            "metrics": metrics,
             "complete": not verification_errors and len(trajectories) == len(records),
-            "episodes": [
-                {
-                    "task_id": t.task.task_id,
-                    "run_id": t.run_id,
-                    "database_sha256": t.database_sha256,
-                    "terminal_reason": t.terminal_reason,
-                    "reward": t.reward.model_dump(),
-                }
-                for t in trajectories
+            "episodes": episode_records,
+            "failure_trajectories": [
+                item
+                for item in episode_records
+                if item.get("verification_status") == "error"
+                or not (item.get("reward") or {}).get("success", False)
             ],
         }
         report_path = output / "report.json"
@@ -70,7 +85,7 @@ def evaluate_suite(
             trajectory = run_episode(
                 task.public, policy, database, settings, output / "sql-audit.jsonl"
             )
-            store.save(trajectory)
+            trajectory_path = store.save(trajectory)
             try:
                 reward = verify(task, trajectory, database)
             except Exception as exc:
@@ -80,13 +95,37 @@ def evaluate_suite(
                         "type": type(exc).__name__,
                         "message": str(exc),
                         "run_id": trajectory.run_id,
+                        "trajectory_path": str(trajectory_path.relative_to(output)),
+                    }
+                )
+                episode_records.append(
+                    {
+                        "task_id": trajectory.task.task_id,
+                        "run_id": trajectory.run_id,
+                        "database_sha256": trajectory.database_sha256,
+                        "terminal_reason": trajectory.terminal_reason,
+                        "reward": None,
+                        "verification_status": "error",
+                        "verification_error": verification_errors[-1],
+                        "trajectory_path": str(trajectory_path.relative_to(output)),
                     }
                 )
                 write_report()
                 continue
             trajectory = trajectory.model_copy(update={"reward": reward})
-            store.save(trajectory)
+            trajectory_path = store.save(trajectory)
             trajectories.append(trajectory)
+            episode_records.append(
+                {
+                    "task_id": trajectory.task.task_id,
+                    "run_id": trajectory.run_id,
+                    "database_sha256": trajectory.database_sha256,
+                    "terminal_reason": trajectory.terminal_reason,
+                    "reward": trajectory.reward.model_dump(),
+                    "verification_status": "scored",
+                    "trajectory_path": str(trajectory_path.relative_to(output)),
+                }
+            )
             write_report()
     finally:
         report = write_report()
