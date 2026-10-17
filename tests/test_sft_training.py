@@ -7,12 +7,38 @@ from pathlib import Path
 
 import pytest
 
+from enterprise_agent_rl.lora import lora_parameter_names, trainable_lora_parameters
 from enterprise_agent_rl.sft_training import (
     SFTDataError,
     audit_tokenized_dataset,
     format_sft_example,
     load_dataset_rows,
 )
+
+
+class FakeParameter:
+    def __init__(self, count: int):
+        self._count = count
+        self.requires_grad = True
+
+    def requires_grad_(self, value: bool):
+        self.requires_grad = value
+        return self
+
+    def numel(self):
+        return self._count
+
+
+class FakeLoRAModel:
+    def __init__(self):
+        self.parameters_by_name = [
+            ("model.layers.0.q_proj.base.weight", FakeParameter(32)),
+            ("model.layers.0.q_proj.lora_A", FakeParameter(8)),
+            ("model.layers.0.q_proj.lora_B", FakeParameter(8)),
+        ]
+
+    def named_parameters(self):
+        return iter(self.parameters_by_name)
 
 
 class FakeTokenizer:
@@ -45,6 +71,20 @@ def _example():
         "assistant_message_indices": [2, 4],
         "assistant_only_loss": True,
     }
+
+
+def test_lora_parameter_filter_freezes_base_and_keeps_only_manual_lora():
+    model = FakeLoRAModel()
+
+    trainable = trainable_lora_parameters(model)
+
+    assert len(trainable) == 2
+    assert lora_parameter_names(model) == [
+        "model.layers.0.q_proj.lora_A",
+        "model.layers.0.q_proj.lora_B",
+    ]
+    assert model.parameters_by_name[0][1].requires_grad is False
+    assert all(parameter.requires_grad for parameter in trainable)
 
 
 def test_mask_targets_only_assistant_spans():

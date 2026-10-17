@@ -116,6 +116,16 @@ def trainable_lora_parameters(model: Any) -> list[Any]:
     return parameters
 
 
+def lora_parameter_names(model: Any) -> list[str]:
+    """Return the registered parameter names belonging to manual LoRA."""
+
+    return [
+        name
+        for name, _ in model.named_parameters()
+        if name.rsplit(".", 1)[-1] in {"lora_A", "lora_B"}
+    ]
+
+
 def adapter_state_dict(model: Any) -> dict[str, Any]:
     """Return PEFT-shaped keys without serializing the frozen base model."""
 

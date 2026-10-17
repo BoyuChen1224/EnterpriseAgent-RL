@@ -21,12 +21,16 @@ import socket
 import subprocess
 import sys
 import time
+from collections import Counter
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 from enterprise_agent_rl.inference_stability import attention_backend_context
 from enterprise_agent_rl.lora import (
     inject_lora_modules,
+    iter_lora_modules,
+    lora_parameter_names,
     save_adapter,
     trainable_lora_parameters,
 )
@@ -75,6 +79,13 @@ def _nvidia_smi() -> dict[str, Any]:
         "query_status": query.returncode,
         "query": query.stdout.strip() or query.stderr.strip(),
     }
+
+
+def _package_version(distribution: str) -> str:
+    try:
+        return version(distribution)
+    except PackageNotFoundError:
+        return "not-installed"
 
 
 def _set_seed(seed: int, torch: Any) -> None:
@@ -209,6 +220,7 @@ def _environment(
         "torch": torch.__version__,
         "cuda_runtime": torch.version.cuda,
         "transformers": transformers.__version__,
+        "peft": _package_version("peft"),
         "python": sys.version,
         "platform": platform.platform(),
         "hostname": platform.node(),
@@ -401,12 +413,113 @@ def main() -> int:
         dropout=args.lora_dropout,
         target_modules=TARGET_MODULES,
     )
+    target_counts = Counter(name.rsplit(".", 1)[-1] for name in module_names)
+    missing_targets = sorted(set(TARGET_MODULES) - set(target_counts))
+    if missing_targets:
+        raise RuntimeError(f"lora_target_modules_missing:{missing_targets}")
+    if not module_names:
+        raise RuntimeError("lora_injected_module_count_zero")
+    injected_module_names = [name for name, _ in iter_lora_modules(model)]
+    if set(injected_module_names) != set(module_names):
+        raise RuntimeError(
+            "lora_injected_module_names_mismatch:"
+            f"expected={len(module_names)}:actual={len(injected_module_names)}"
+        )
+
     trainable = trainable_lora_parameters(model)
+    trainable_names = lora_parameter_names(model)
+    expected_lora_names = {
+        f"{module_name}.{suffix}"
+        for module_name in module_names
+        for suffix in ("lora_A", "lora_B")
+    }
+    if set(trainable_names) != expected_lora_names:
+        raise RuntimeError(
+            "lora_trainable_parameter_names_mismatch:"
+            f"expected={len(expected_lora_names)}:actual={len(trainable_names)}"
+        )
+    unexpected_trainable = [
+        name
+        for name, parameter in model.named_parameters()
+        if parameter.requires_grad and name not in expected_lora_names
+    ]
+    if unexpected_trainable:
+        raise RuntimeError(
+            "unexpected_base_parameters_trainable:" + repr(unexpected_trainable[:8])
+        )
     trainable_count = sum(int(parameter.numel()) for parameter in trainable)
+    total_parameter_count = sum(int(parameter.numel()) for parameter in model.parameters())
+    trainable_ratio = trainable_count / total_parameter_count if total_parameter_count else 0.0
+    base_trainable_count = sum(
+        int(parameter.numel())
+        for name, parameter in model.named_parameters()
+        if name not in expected_lora_names and parameter.requires_grad
+    )
+    if trainable_count <= 0:
+        raise RuntimeError("lora_trainable_parameter_count_zero")
+    if base_trainable_count != 0:
+        raise RuntimeError(f"base_model_trainable_parameter_count:{base_trainable_count}")
+    if total_parameter_count <= 0 or not 0.0 < trainable_ratio < 1.0:
+        raise RuntimeError(f"lora_trainable_parameter_ratio_invalid:{trainable_ratio}")
     optimizer = torch.optim.AdamW(
         trainable,
         lr=args.learning_rate,
         weight_decay=args.weight_decay,
+    )
+    optimizer_parameter_count = sum(
+        len(group.get("params", [])) for group in optimizer.param_groups
+    )
+    if not optimizer.param_groups or optimizer_parameter_count <= 0:
+        raise RuntimeError("optimizer_parameter_groups_empty")
+    if {
+        id(parameter)
+        for group in optimizer.param_groups
+        for parameter in group.get("params", [])
+    } != {id(parameter) for parameter in trainable}:
+        raise RuntimeError("optimizer_parameters_do_not_match_lora_parameters")
+
+    lora_preflight = {
+        "schema_version": "1.0",
+        "status": "passed",
+        "target_modules": list(TARGET_MODULES),
+        "matched_module_names": module_names,
+        "matched_module_count": len(module_names),
+        "matched_module_counts_by_target": {
+            target: target_counts.get(target, 0) for target in TARGET_MODULES
+        },
+        "missing_target_modules": missing_targets,
+        "injected_module_names": injected_module_names,
+        "injected_module_count": len(injected_module_names),
+        "trainable_parameter_names": trainable_names,
+        "trainable_parameter_count": trainable_count,
+        "total_model_parameter_count": total_parameter_count,
+        "trainable_parameter_ratio": trainable_ratio,
+        "base_trainable_parameter_count": base_trainable_count,
+        "all_trainable_parameters_are_lora": not unexpected_trainable,
+        "unexpected_trainable_parameter_names": unexpected_trainable,
+        "optimizer_group_count": len(optimizer.param_groups),
+        "optimizer_parameter_count": optimizer_parameter_count,
+        "optimizer_parameter_groups_nonempty": True,
+        "optimizer_parameters_match_lora_parameters": True,
+        "created_at_utc": _now(),
+    }
+    (args.output / "lora-preflight.json").write_text(
+        json.dumps(lora_preflight, ensure_ascii=False, indent=2) + "\n"
+    )
+    print(
+        json.dumps(
+            {
+                "lora_runtime_assertions": "passed",
+                "matched_module_names": module_names,
+                "matched_module_count": len(module_names),
+                "trainable_parameter_count": trainable_count,
+                "trainable_parameter_ratio": trainable_ratio,
+                "optimizer_group_count": len(optimizer.param_groups),
+                "optimizer_parameter_count": optimizer_parameter_count,
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
     )
     updates_per_epoch = math.ceil(
         math.ceil(len(formatted) / args.batch_size) / args.gradient_accumulation_steps
