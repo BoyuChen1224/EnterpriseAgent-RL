@@ -104,7 +104,9 @@ def iter_lora_modules(model: Any):
 def trainable_lora_parameters(model: Any) -> list[Any]:
     parameters = []
     for name, parameter in model.named_parameters():
-        if ".lora_A." in name or ".lora_B." in name:
+        # lora_A/lora_B are registered directly as Parameters, so PyTorch
+        # names them ``...lora_A`` rather than ``...lora_A.weight``.
+        if name.rsplit(".", 1)[-1] in {"lora_A", "lora_B"}:
             parameter.requires_grad_(True)
             parameters.append(parameter)
         else:
