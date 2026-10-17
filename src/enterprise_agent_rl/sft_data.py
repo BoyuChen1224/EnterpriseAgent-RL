@@ -35,6 +35,7 @@ EXPECTED_SPLIT_COUNTS = {"train": 20, "validation": 20, "test": 20}
 KNOWN_POLICY_SOURCES = {
     "deterministic_fixture": "deterministic_fixture_expert",
     "local_llm": "local_llm",
+    "programmatic_reference_sql_teacher": "reference_sql_teacher",
 }
 
 
@@ -236,12 +237,24 @@ def trajectory_to_example(
             "reward_success": True,
             "reward_value": trajectory.reward.value if trajectory.reward else None,
             "raw_generation_available": raw_generation_available,
+            "verified_success": bool(trajectory.reward and trajectory.reward.success),
+            "actual_tool_execution": any(step.tool_name for step in trajectory.steps),
+            "verifier_success": bool(trajectory.reward and trajectory.reward.success),
         },
     }
 
 
 def _validate_example(example: dict[str, Any]) -> None:
-    if "reference_sql" in json.dumps(example, ensure_ascii=False):
+    def contains_reference_sql_field(value: Any) -> bool:
+        if isinstance(value, dict):
+            return "reference_sql" in value or any(
+                contains_reference_sql_field(item) for item in value.values()
+            )
+        if isinstance(value, list):
+            return any(contains_reference_sql_field(item) for item in value)
+        return False
+
+    if contains_reference_sql_field(example):
         raise ValueError("reference_sql_leakage")
     messages = example.get("messages")
     indices = example.get("assistant_message_indices")
@@ -265,6 +278,7 @@ def _candidate_reasons(
     trajectory: Trajectory,
     source: TrainSource,
     expected_source: str | None,
+    allowed_sources: set[str] | None,
 ) -> tuple[list[str], dict[str, Any]]:
     task_id = trajectory.task.task_id
     reasons: list[str] = []
@@ -290,6 +304,8 @@ def _candidate_reasons(
         reasons.append("unknown_policy_kind")
     elif expected_source is not None and inferred_source != expected_source:
         reasons.append("trajectory_source_mismatch")
+    elif allowed_sources is not None and inferred_source not in allowed_sources:
+        reasons.append("trajectory_source_not_allowed")
 
     try:
         replay_result = replay(trajectory, database)
@@ -312,9 +328,17 @@ def _candidate_reasons(
             reasons.append("verifier_success_required")
         if rescored.value <= 0:
             reasons.append("reward_not_positive")
+        details["reward_consistent"] = trajectory.reward is not None and (
+            trajectory.reward.model_dump() == rescored.model_dump()
+        )
+        details["verifier_success"] = rescored.success
     except Exception as exc:
         details["verifier_error"] = f"{type(exc).__name__}:{exc}"
         reasons.append("verifier_error")
+
+    details["actual_tool_execution"] = any(step.tool_name for step in trajectory.steps)
+    if not details["actual_tool_execution"]:
+        reasons.append("actual_tool_execution_required")
 
     if trajectory.terminal_reason != "completed":
         reasons.append("trajectory_not_completed")
@@ -359,6 +383,18 @@ def _quality_flags(
             "passed": all(item.get("format_valid", False) for item in accepted_details),
             "accepted_count": len(accepted),
         },
+        "execution_validation": {
+            "passed": all(
+                item.get("replay", {}).get("matched") is True
+                and item.get("actual_tool_execution") is True
+                for item in accepted_details
+            ),
+            "accepted_count": len(accepted),
+        },
+        "reward_consistency_validation": {
+            "passed": all(item.get("reward_consistent") is True for item in accepted_details),
+            "accepted_count": len(accepted),
+        },
         "rejected_candidate_count": len(rejected),
     }
 
@@ -371,6 +407,7 @@ def build_sft_dataset(
     *,
     dataset_version: str = DATASET_VERSION,
     expected_trajectory_source: str | None = "deterministic_fixture_expert",
+    allowed_trajectory_sources: set[str] | None = None,
 ) -> dict[str, Any]:
     """Build JSONL SFT data and audit artifacts from verified train trajectories."""
 
@@ -394,7 +431,12 @@ def build_sft_dataset(
             )
             continue
 
-        reasons, details = _candidate_reasons(trajectory, source, expected_trajectory_source)
+        reasons, details = _candidate_reasons(
+            trajectory,
+            source,
+            expected_trajectory_source,
+            allowed_trajectory_sources,
+        )
         details["path"] = str(path)
         details["trajectory_schema_valid"] = True
         content_hash = _trajectory_content_hash(trajectory)
@@ -415,6 +457,16 @@ def build_sft_dataset(
         seen_content[content_hash] = trajectory.run_id
         record = source.records[trajectory.task.task_id]
         example = trajectory_to_example(trajectory, record, details["trajectory_source"])
+        example["source"].update(
+            {
+                "trajectory_path": str(path),
+                "trajectory_content_sha256": content_hash,
+                "actual_tool_execution": details.get("actual_tool_execution", False),
+                "verifier_success": details.get("verifier_success", False),
+                "reward_consistent": details.get("reward_consistent", False),
+                "template_id": record.get("template"),
+            }
+        )
         _validate_example(example)
         accepted.append(
             {
@@ -481,6 +533,7 @@ def build_sft_dataset(
     policy_sources = sorted({item["trajectory_source"] for item in accepted})
     policy_kinds = sorted({item["trajectory"].policy_kind for item in accepted})
     policy_versions = sorted({item["trajectory"].policy_version for item in accepted})
+    trajectory_source_distribution = dict(Counter(item["trajectory_source"] for item in accepted))
 
     metadata = {
         "schema_version": DATASET_SCHEMA_VERSION,
@@ -511,6 +564,7 @@ def build_sft_dataset(
         },
         "test_leakage": {"count": len(test_leakage), "accepted_task_ids": test_leakage},
         "policy_sources": policy_sources,
+        "trajectory_source_distribution": trajectory_source_distribution,
         "policy_kinds": policy_kinds,
         "policy_versions": policy_versions,
         "teacher": {
@@ -522,6 +576,7 @@ def build_sft_dataset(
             ),
         },
         "verifier": "enterprise_agent_rl.rewards.verify",
+        "verifier_version": "enterprise_agent_rl.rewards.verify",
         "reward_version": reward_version(),
         "manifest_sha256": source.manifest_sha256,
         "database_fingerprint_kind": source.database_fingerprint_kind,
@@ -559,6 +614,7 @@ def build_sft_dataset(
         "rejected_candidates": len(rejected),
         "accepted_task_ids": sorted(task_counts),
         "accepted_templates": accepted_templates,
+        "trajectory_source_distribution": trajectory_source_distribution,
         "quality": quality,
         "rejection_reason_counts": dict(
             sorted(Counter(reason for item in rejected for reason in item["reasons"]).items())

@@ -44,7 +44,11 @@ class Trajectory(Contract):
     run_id: str
     task: PublicTask
     policy_version: str
-    policy_kind: Literal["deterministic_fixture", "local_llm"]
+    policy_kind: Literal[
+        "deterministic_fixture",
+        "local_llm",
+        "programmatic_reference_sql_teacher",
+    ]
     database_sha256: str
     settings: Settings
     initial_observation: Observation
