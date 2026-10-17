@@ -28,6 +28,7 @@ from enterprise_agent_rl.inference_stability import (
     describe_attention_backend,
     transformers_attention_implementation,
 )
+from enterprise_agent_rl.lora import merge_lora_adapter
 from enterprise_agent_rl.model_protocol import GenerationSettings
 
 
@@ -75,7 +76,13 @@ def append_event(path: Path, event: dict) -> None:
 
 
 class QwenEngine:
-    def __init__(self, cfg: ModelSettings, cache: Path, output: Path):
+    def __init__(
+        self,
+        cfg: ModelSettings,
+        cache: Path,
+        output: Path,
+        adapter: Path | None = None,
+    ):
         require_compute_node()
         import torch
         import transformers
@@ -131,6 +138,20 @@ class QwenEngine:
             raise RuntimeError("output_attentions_must_be_false_for_sdpa")
         if getattr(self.model.generation_config, "remove_invalid_values", False):
             raise RuntimeError("generation_config_non_finite_repair_enabled")
+        adapter_metadata = None
+        if adapter is not None:
+            adapter_metadata = merge_lora_adapter(
+                self.model,
+                adapter,
+                expected_model_id=cfg.model_id,
+                expected_revision=cfg.revision,
+            )
+            torch.cuda.synchronize()
+            if not all(
+                bool(torch.isfinite(parameter).all().item())
+                for parameter in self.model.parameters()
+            ):
+                raise RuntimeError("adapter_merge_produced_non_finite_weights")
         model_dtype = str(next(self.model.parameters()).dtype)
         gpu_name = torch.cuda.get_device_name(0)
         compute_capability = list(capability)
@@ -173,6 +194,8 @@ class QwenEngine:
                 "cache_size_bytes_unique": cache_manifest.get("cache_size_bytes_unique"),
                 "integrity": cache_manifest.get("integrity"),
             },
+            "adapter": adapter_metadata,
+            "adapter_path": str(adapter) if adapter is not None else None,
         }
         (output / "model-load.json").write_text(json.dumps(self.metadata, indent=2) + "\n")
 
@@ -395,11 +418,17 @@ def main():
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument("--adapter", type=Path)
     args = parser.parse_args()
     require_compute_node()
     args.output.mkdir(parents=True, exist_ok=True)
     try:
-        engine = QwenEngine(ModelSettings.load(args.config), args.cache, args.output)
+        engine = QwenEngine(
+            ModelSettings.load(args.config),
+            args.cache,
+            args.output,
+            args.adapter,
+        )
     except Exception as exc:
         append_event(
             args.output / "startup-errors.jsonl",

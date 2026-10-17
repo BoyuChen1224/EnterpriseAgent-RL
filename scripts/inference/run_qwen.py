@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import signal
@@ -96,6 +97,11 @@ def main():
     parser.add_argument("--manifest", type=Path, default=Path("benchmarks/m2a/manifest.json"))
     parser.add_argument("--database-root", type=Path, default=Path("artifacts/m2a-databases"))
     parser.add_argument("--split", choices=["train", "validation", "test"], default="validation")
+    parser.add_argument(
+        "--adapter",
+        type=Path,
+        help="Optional manual-LoRA adapter directory; merged into the fixed base model at load.",
+    )
     args = parser.parse_args()
     require_compute_node()
     # Refuse reused run directories; previous partial evidence must survive.
@@ -116,6 +122,7 @@ def main():
         "node": socket.gethostname(),
         "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
         "git_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"])),
+        "adapter": str(args.adapter) if args.adapter else None,
         "acceptance": {
             "infrastructure_smoke": "pending",
             "protocol_smoke": "not_run",
@@ -136,6 +143,13 @@ def main():
     )
     log = (args.output / "server.log").open("w")
     process = None
+    if args.adapter:
+        adapter_weight = args.adapter / "adapter_model.safetensors"
+        if not adapter_weight.is_file():
+            raise RuntimeError("adapter_weight_file_missing")
+        policy_version = "qwen-sft-" + hashlib.sha256(adapter_weight.read_bytes()).hexdigest()[:12]
+    else:
+        policy_version = "qwen-base-" + cfg.revision[:12]
 
     def interrupted(signum, frame):
         raise SystemExit(128 + signum)
@@ -144,20 +158,23 @@ def main():
     signal.signal(signal.SIGINT, interrupted)
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
+        server_command = [
+            sys.executable,
+            "-m",
+            "enterprise_agent_rl.model_server",
+            "--cache",
+            str(args.cache),
+            "--config",
+            str(args.model_config),
+            "--output",
+            str(args.output / "server"),
+            "--port",
+            str(port),
+        ]
+        if args.adapter:
+            server_command.extend(["--adapter", str(args.adapter)])
         process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "enterprise_agent_rl.model_server",
-                "--cache",
-                str(args.cache),
-                "--config",
-                str(args.model_config),
-                "--output",
-                str(args.output / "server"),
-                "--port",
-                str(port),
-            ],
+            server_command,
             stdout=log,
             stderr=subprocess.STDOUT,
             start_new_session=True,
@@ -211,7 +228,7 @@ def main():
             policy = LocalModelPolicy(
                 endpoint + "/v1/chat/completions",
                 cfg.model_id,
-                "qwen-base-" + cfg.revision[:12],
+                policy_version,
                 cfg.generation,
             )
             protocol = run_protocol_smoke(policy, settings, args.output / "protocol")
@@ -222,7 +239,7 @@ def main():
             policy = LocalModelPolicy(
                 endpoint + "/v1/chat/completions",
                 cfg.model_id,
-                "qwen-base-" + cfg.revision[:12],
+                policy_version,
                 cfg.generation,
             )
             if args.mode == "agent":
