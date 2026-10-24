@@ -132,12 +132,47 @@ def main() -> int:
             "scope": "cpu",
         },
         {
-            "name": "qwen3_pinned_snapshot_download",
+            "name": "qwen3_pinned_snapshot_download_initial",
+            "command": (
+                ".venv-qwen3/bin/python scripts/setup/cache_qwen.py "
+                "--cache artifacts/model-cache-qwen3-8b --config configs/model/qwen3-8b.toml"
+            ),
+            "exit_code": 1,
+            "failure_class": "network_chunked_encoding_incomplete_read",
+            "log": "logs/cache-download.log",
+            "scope": "login",
+        },
+        {
+            "name": "qwen3_pinned_snapshot_download_retry_1",
+            "command": (
+                ".venv-qwen3/bin/python scripts/setup/cache_qwen.py "
+                "--cache artifacts/model-cache-qwen3-8b --config configs/model/qwen3-8b.toml"
+            ),
+            "exit_code": 1,
+            "failure_class": "network_tls_unexpected_eof",
+            "log": "logs/cache-download-retry-1.log",
+            "scope": "login",
+        },
+        {
+            "name": "qwen3_pinned_snapshot_download_retry_2",
+            "command": (
+                ".venv-qwen3/bin/python scripts/setup/cache_qwen.py "
+                "--cache artifacts/model-cache-qwen3-8b --config configs/model/qwen3-8b.toml"
+            ),
+            "exit_code": 1,
+            "failure_class": "network_tls_unexpected_eof",
+            "log": "logs/cache-download-retry-2.log",
+            "scope": "login",
+        },
+        {
+            "name": "qwen3_pinned_snapshot_download_retry_3",
             "command": (
                 ".venv-qwen3/bin/python scripts/setup/cache_qwen.py "
                 "--cache artifacts/model-cache-qwen3-8b --config configs/model/qwen3-8b.toml"
             ),
             "exit_code": args.cache_download_exit_code,
+            "failure_class": None,
+            "log": "logs/cache-download-retry-3.log",
             "scope": "login",
         },
         {
@@ -148,6 +183,14 @@ def main() -> int:
                 "--output artifacts/qwen3-base-lora-pilot/t031-v1/cache-verification.json"
             ),
             "exit_code": args.cache_verification_exit_code,
+            "log": "logs/cache-verification-final.log",
+            "scope": "login",
+        },
+        {
+            "name": "qwen3_cached_tokenizer_hard_off_smoke",
+            "command": "inline cached tokenizer smoke; see tokenizer-preflight.json",
+            "exit_code": 0,
+            "log": "tokenizer-preflight.json",
             "scope": "login",
         },
         *[
