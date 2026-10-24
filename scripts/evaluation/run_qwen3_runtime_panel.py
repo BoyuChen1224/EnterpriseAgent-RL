@@ -930,6 +930,47 @@ def compare(output: Path) -> dict[str, Any]:
     )
     base = json.loads((output / "evaluation" / "base" / "metrics.json").read_text())
     sft = json.loads((output / "evaluation" / "sft" / "metrics.json").read_text())
+    resource_accounting = {
+        "compare_job_id": None,
+        "partition": None,
+        "node": None,
+        "gpu_count": None,
+        "wrapper_wall_time_s": None,
+        "allocation_elapsed_s": None,
+        "allocation_gpu_minutes_shared": None,
+        "slurm_accounting_evidence_path": None,
+        "currency_cost": None,
+        "currency_cost_source": None,
+        "service_wall_definition": "shared concurrent Base/SFT compare wrapper wall time",
+    }
+    ledger_path = output / "allocation-ledger.json"
+    if ledger_path.is_file():
+        ledger = json.loads(ledger_path.read_text())
+        completed_compare = [
+            record
+            for record in ledger.get("records", [])
+            if record.get("stage") == "compare" and record.get("status") == "COMPLETED"
+        ]
+        if completed_compare:
+            record = completed_compare[-1]
+            resource_accounting.update(
+                {
+                    "compare_job_id": record.get("job_id"),
+                    "partition": record.get("partition"),
+                    "node": record.get("node"),
+                    "gpu_count": record.get("gpu_count"),
+                    "wrapper_wall_time_s": record.get("wrapper_elapsed_s"),
+                    "allocation_gpu_minutes_shared": record.get("wrapper_gpu_minutes"),
+                    "slurm_accounting_evidence_path": record.get("slurm_accounting_evidence_path"),
+                }
+            )
+            evidence_path = record.get("slurm_accounting_evidence_path")
+            if evidence_path and Path(evidence_path).is_file():
+                lines = [line for line in Path(evidence_path).read_text().splitlines() if line]
+                if len(lines) >= 2:
+                    fields = lines[1].split("|")
+                    if len(fields) >= 3:
+                        resource_accounting["allocation_elapsed_s"] = int(fields[2])
     complete = (
         base["status"] == "FROZEN_COMPARISON_ARM_COMPLETE"
         and sft["status"] == "FROZEN_COMPARISON_ARM_COMPLETE"
@@ -987,12 +1028,20 @@ def compare(output: Path) -> dict[str, Any]:
             "sft_adapter": str((output / "training" / "final-adapter").resolve()),
             "checkpoint_selection": "step27_fixed_before_scoring",
         },
+        "resource_accounting": resource_accounting,
         "validation_manifest_sha256": hashlib.sha256(
             (output / "evaluation" / "validation" / "validation-manifest.json").read_bytes()
         ).hexdigest(),
         "finished_at_utc": _now(),
     }
     _write_json(output / "comparison.json", comparison)
+    for arm_name, arm_metrics in (("base", base), ("sft", sft)):
+        arm_metrics["resource_accounting"] = {
+            **resource_accounting,
+            "arm_share": "shared_concurrent_compare_job",
+        }
+        _write_json(output / "evaluation" / arm_name / "metrics.json", arm_metrics)
+        _write_json(output / "evaluation" / arm_name / "summary.json", arm_metrics)
     _write_json(
         output / "metrics.json",
         {
@@ -1058,6 +1107,9 @@ def compare(output: Path) -> dict[str, Any]:
         "不扩训、不扫参、不启动 GRPO。",
         "- 资源与 Job 证据见 [allocation-ledger.json](allocation-ledger.json)、"
         "[job-chain.json](job-chain.json)；wrapper GPU分钟与 Slurm allocation evidence 分列。",
+        f"- 并发 compare wrapper wall=`{resource_accounting['wrapper_wall_time_s']}`秒，"
+        f"共享 allocation GPU分钟=`{resource_accounting['allocation_gpu_minutes_shared']}`；"
+        "货币成本=`null`（无计费来源）。",
     ]
     (output / "report.md").write_text("\n".join(report_lines) + "\n")
     write_run_manifest(output)
