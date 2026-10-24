@@ -280,7 +280,7 @@ Qwen2.5 validation result.
 
 {_case_table(base_metrics, run / 'base' / 'case-results.jsonl')}
 
-Counts: `{json.dumps(base_metrics.get('counts', {{}}), ensure_ascii=False)}`  
+Counts: `{json.dumps(base_metrics.get('counts', {}), ensure_ascii=False)}`
 Business success rate (planned denominator): `{base_metrics.get('business_success_rate')}`  
 SQL executable rate: `{base_metrics.get('sql_executable_rate')}`  
 Engine events: `{base_metrics.get('engine_events')}`; tool calls/errors: `{tool_summary}`  
