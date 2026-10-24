@@ -1,38 +1,81 @@
-# 下一阶段实施入口
+# 路线图与阶段状态
 
-当前验收覆盖 CPU 数据与执行链路，尚无真实 LLM 基线、SFT、GRPO 或模型性能提升数据。以下是实施顺序，不是已完成清单。
+更新：2026-10-24。当前工作主线是“已具有限真实后训练/冻结评测/本地 API 证据的小规模工程”向“可复核的技术手册和运行入口”收口。T-029 只校准文档与复现说明，不新增训练、评测、部署或研究目标。
 
-## M2A 当前交付
+## 状态定义
 
-已在 `dev/qwen-base-inference` 实现固定 Qwen revision 的 FP16/eager 服务、原始动作审计、独立推理预算、冻结 60 任务及 Slurm 运行入口。真实 GPU 和 Base 评测等待收费授权，具体完成/待验收边界见 [M2A](milestone-2a.md) 与 [V100](v100-compatibility.md)。本轮不开展 SFT/GRPO。
+| 状态 | 含义 |
+| --- | --- |
+| 已验证 | 指定范围有审核过的静态或运行证据；不自动扩展到更大数据、更多 seed 或生产环境 |
+| 已实现 | 源码/配置/入口存在，但不等于对应能力已通过真实运行 |
+| 历史计划 | 旧阶段曾计划的工作，不能覆盖后续审核结果 |
+| 未来扩展 | 当前工程之外的规模化、泛化或部署目标 |
 
-## M2B 真实推理验收入口
+## 当前主线
 
-从 `dev/qwen-base-inference@6a4155b` 创建的 `dev/gpu-baseline` 先完成固定 revision 缓存、逐文件完整性校验、实验配置冻结、Slurm 预检和 train-only 专家轨迹审计。真实验收分为 Infrastructure Smoke、Protocol Smoke、Agent Capability Smoke 和 validation Base report；收费 GPU 未获授权时全部 GPU 结果保持 Pending。详细证据口径见 [M2B](milestone-2b.md)。
+| 阶段 | 当前状态 | 证据与边界 |
+| --- | --- | --- |
+| CPU Agent MVP | 已验证 | 10 个合成任务定义、Runtime/只读 SQL/轨迹/Reward/API；fixture 不是 LLM 能力结果 |
+| M2A 推理工程 | 已实现/历史背景 | 固定 Qwen 服务、60 项冻结清单和 Slurm 入口；旧 Pending 句子保留为历史，不覆盖 E-026 |
+| SFT 数据与 pilot | 已验证（限定） | train-only 数据、FP16/SDPA manual LoRA、T-017-R2 的 27 次有效更新和 N adapter；旧失败与未运行评测保留 |
+| SFT N 能力面板 | 已验证（限定） | E-026/T-025：N 20/20 评分、8/20 成功；单 seed、共享 schema/template，不能推出全面可靠或跨模板泛化 |
+| GRPO rollout/update | 已验证（限定后端） | 多轮 rollout、TokenRecord、response-only mask、组内优势、有限更新、恢复和 final-delta 证据；不是完整 TRL Trainer 或长训 |
+| Base/N/RL 冻结对照 | 已验证（本协议） | E-026：Base 0/20、N 8/20、RL 8/20、unknown 0；N−Base +40 个百分点，RL−N 0 |
+| N model/API 集成 | 已验证（两项 train smoke） | E-027/T-026：固定 N、26 HTTP/model events、两项业务结果；不是 validation/generalization |
+| 服务生命周期与 CPU fixture | 已验证（CPU 合同） | T-028：25 passed，唯一 run、来源计数/null、全 tmp fixture/访问守卫；新模式未重新 V100 |
+| 技术文档/复现入口 | 本轮收口 | README、架构、路线图、GRPO/服务手册和 reproducibility 与当前源码/证据对齐 |
 
-## M2：设备审计与最小兼容闭环
+## 当前工程真正已经交付的能力
 
-1. 从 `docs/environment-audit.md` 复核用户政策、个人存储 quota、可选 GPU 账户/QOS。仅在获得用户新的明确收费授权后，选择单卡 gpu2Q、显式短时限，先提交已准备的 `scripts/slurm/gpu_inventory.sbatch`。不要在登录节点运行 nvidia-smi 推理/模型加载，不使用八卡长期作业。
-2. 采集 GPU 型号、实际显存、驱动、CC、CUDA wheel 架构与容器执行情况，决定独立 Python 3.11/3.12 GPU 环境和 CUDA 依赖。优先 Transformers FP16 + eager，无 BF16/FA2 默认值。完整依赖锁与 CPU 锁分离。
-3. 在已有许可和存储空间下下载 Qwen2.5-1.5B-Instruct 的固定 revision，先单轮 32–128 token，再使用 LocalModelPolicy 跑一个多轮任务。记录峰值 allocated/reserved、生成 token/s、首次加载和端到端 latency、错误与环境元数据。3B 待 1.5B 通过后评估。
-4. 在隔离环境验证微批次 1 的 LoRA SFT 数步，FP16 GradScaler、梯度裁剪、有限 loss/grad、checkpoint 保存与恢复；保存 model/optimizer/scheduler/scaler/RNG/sampler 状态。
-5. 验证上游 GRPO 后端是否能避开 FA2/BF16 路径；用真实环境按同一任务采多条不同轨迹，验证终局 reward、response-only mask、group advantage 和有限梯度。未通过前不做正式训练。
-6. 产出 `docs/v100-compatibility.md`，逐条区分已运行、失败和候选。该文件已记录登录节点实测元数据，GPU 字段保持 Pending，不能把预案当作实测报告。
+1. 公开任务可经 Runtime 规划、schema/dictionary/只读 SQL、check/finish 形成结构化 trajectory。
+2. 独立 Verifier 在模型消息之外判断 reference SQL、业务约束和最终答案；SQL 可执行性不替代业务成功。
+3. train-only SFT 路径和 N adapter lineage 已有审核证据；validation/test 仍不回流训练。
+4. formal GRPO 路径能保存多轮 token/logprob/mask、group advantage、预算、更新状态和 parent/delta 身份；CPU fake/tiny 与有限 V100 证据分开。
+5. Frozen eval 能从 fresh Base 分别加载 Base、parent N 和 parent N + fixed final delta，并按 arm/pair 独立输出 unknown/null。
+6. 固定 N 的 loopback model/API、run-global lifecycle、持久证据派生计数和全 tmp CPU fixture 已有各自范围内证据。
 
-## M3：SFT
+这些能力的代码版本应写成 branch + HEAD + dirty/untracked snapshot；fresh checkout 不包含 ignored assets，不应把源码存在写成可一键复训。
 
-先把 10 个基础任务扩大到足以独立评估的业务集合：多个数据库种子、实体与业务模板；冻结 test manifest 及数据指纹。当前年份参数划分不支持泛化结论。
+## 近期工程动作
 
-仅导出成功且属于 train 的轨迹，去重、验证 prompt/SQL/token 质量，转换为模型 chat template 和 assistant-only loss mask。统一记录 source task/split/database hash，拒绝 test/validation 轨迹进入 SFT。训练前冻结 Base 评测，后评测 SFT 同任务集；模型版本指向真实 checkpoint revision。
+T-029 完成后，本地后训练工程可按以下顺序做阶段总验收：
 
-## M4：多轮 GRPO
+- 复核文档命令与实际 help/配置；缺少 cache、N adapter、GRPO delta、DB、benchmark plan 或 private task plan 时显式报缺。
+- 以 manifest、source snapshot、run-local evidence 和 code version 对齐历史结果，不重跑旧实验，不把旧 artifact 变成当前 fresh run。
+- 如需新实验，先独立冻结 task/database/model/config/seed/预算，再用新的 run 目录和 Experiment ID；不要用文档更新触发训练或完整评测。
 
-使用固定上游版本的算法与训练框架；将本项目 env 适配到 reset/step、终局 reward 和真实多轮 rollout，而不是对单条 SQL 做离线打分后声称完成 Agent RL。
+这些是复核动作，不是本任务新增 GPU 门槛。
 
-补充 rollout token IDs、logprobs、采样 seed/temperature、policy revision、环境返回的 observation masks；验证同 prompt 分组和 tool token 不参与策略损失。训练任务使用 Slurm signal/preemption 保存，明确恢复 epoch/step、optimizer/scaler/RNG 与 replay buffer 状态。先 Base/SFT/RL 三组同预算对照，再做主奖励/成本项/恢复项消融；同时报告质量和效率及多 seed 不确定性。
+## 真正剩余工作与未来扩展
 
-## M5：展示与部署
+### 仍需工程化的复现能力
 
-将当前 API 的固定 registry 接入实际 Base/SFT/RL 版本；补充进程外队列、部署鉴权及 PostgreSQL 只读角色。报告关联原始轨迹、运行配置、硬件与 checkpoint。BIRD 适配先核对许可与只读子集，隔离官方测试答案。
+- 把 train-only 数据构建、tokenizer/mask 审计、SFT 训练和 N checkpoint lineage 整理成新的、明确依赖资产的标准 recipe；当前 T-017 pilot 脚本不能被包装为 fresh checkout 一键全量重训。
+- 为每个正式入口继续维护 manifest、源文件快照、命令原文、退出码、指标分子/分母和 dirty code version。
+- 对服务跨 Job allocation 的累计守卫和长期运行行为另行设计；T-028 已披露而未伪造为已实现。
 
-简历描述只能陈述已经实现并验证的工程能力。当前可写多轮执行、安全 SQL、可验证奖励、版本化轨迹、自动评测、FastAPI 与 Slurm CPU 验收；不能填写不存在的 GRPO 收益或 GPU 吞吐数据。
+### 研究扩展
+
+- 多 seed、更多数据库/实体/业务模板和严格跨模板污染检查。
+- 更长的 GRPO 训练、更多 rollout 组、稳定的 checkpoint/resume 和统计不确定性。
+- 将恢复能力、SQL 错误类型、效率/成本和主业务成功率作为分开终点，而不是用 SQL 辅助统计替换业务终点。
+- 对 SFT/GRPO 配方做预注册的消融或公平对照；不改变已封存的 E-026 结果。
+
+### 部署扩展
+
+- 外部队列、PostgreSQL 只读角色、认证、租户隔离、进程/容器隔离、指标和审计服务。
+- 长期服务的多模型 registry、滚动升级、故障恢复和真实容量测试。
+- 这些不是当前小规模本地后训练系统的 MVP 收口门槛。
+
+## 不设为当前门槛的事项
+
+- 不要求 RL 相对 N 必须正增益。E-026 的 RL−N=0 是真实结果，保留并报告，不据此反复扩训。
+- 不要求当前阶段拥有生产多租户、公网部署、PG 后端、分布式队列或鉴权。
+- 不把单 seed、共享模板的 N +40 个百分点写成泛化定论。
+- 不把 CPU fixture/tiny/fake 结果写成 Qwen/V100 或真实业务 SQL 结果。
+
+## 历史路线图的解释
+
+旧 M2A/M3/M4 条目仍保留在历史文档和实施记录中，反映当时“等待真实 GPU、SFT、GRPO”的计划。当前实现和证据已经推进到 SFT N、有限 GRPO、E-026 三臂冻结评测和 E-027 API；阅读旧文档时以本页、README、各审核报告和 docs/reproducibility.md 的时间/版本边界为准。
+
+下一阶段不是继续拆服务微修，而是完成本地后训练工程范围的总验收；若无新的实质性证据缺口，本路线图不自动启动新 Job。

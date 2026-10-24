@@ -29,3 +29,9 @@ logs/
 .venv-gpu/
 .cache/
 *.sif
+
+# Local agent collaboration and experiment working notes.
+/AGENTS.md
+/.codex/
+/docs/orchestrator/
+/docs/experiments/

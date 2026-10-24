@@ -1,85 +1,148 @@
-# 架构与契约
+# 当前架构与数据契约
 
-当前交付面向可验证的企业分析 Agent CPU 基础设施。组件通过显式数据契约连接，不把训练框架或模型客户端嵌入 SQL 环境。
+EnterpriseAgent-RL 由可验证业务 Runtime、模型 Policy、只读 SQL 工具、独立 Verifier、轨迹证据、后训练入口、冻结评测和本地服务组成。业务 Runtime Agent 位于 src/enterprise_agent_rl/agent.py；项目统筹者和总控文档不是 Runtime 的一部分。
+
+## 端到端关系
+
+~~~mermaid
+flowchart LR
+  P[PublicTask] --> R[Runtime]
+  R --> M[Policy]
+  M -->|business messages| R
+  R --> E[Environment]
+  E --> T[Schema / Dictionary / SQL tools]
+  T --> W[read-only SQL worker]
+  W --> D[(business SQLite)]
+  E --> Q[Trajectory]
+  Q --> V[independent Verifier]
+  V --> Z[Reward / evaluation evidence]
+  Q --> S[SFT train-only rows]
+  S --> L[SFT adapter]
+  L --> G[GRPO rollout + update]
+  G --> Z
+  L --> H[model_server + Agent API]
+~~~
+
+同一条链路中的“模型消息”和“评分证据”是两个边界：模型只能看到公开任务、环境 observation、工具返回值和自己的历史输出；reference SQL、expected answer、业务约束、Verifier payload 和最终 RewardResult 由私有评分路径保留。
 
 ## 模块职责
 
-| 模块 | 职责与边界 |
-|---|---|
-| `common.py` | 严格 Pydantic 公共契约、TOML 配置、JSON 日志；拒绝未知字段 |
-| `data.py` | 固定 seed 的五表企业数据库与公开任务/隐藏参考查询注册表 |
-| `agent.py` | Policy 协议、反馈驱动 fixture、本地模型 HTTP 适配、episode 循环 |
-| `environment.py` | reset(task)/step(action)、预算、工具错误反馈、检查与完成状态 |
-| `tools.py` | Schema/外键发现、业务字典、受限子进程调用、审计 |
-| `sql_worker.py` | 只使用 stdlib 的单查询受限进程，无模型/训练/验证答案访问接口 |
-| `trajectories.py` | v1.0 轨迹校验、原子保存、JSONL 导出、按数据库哈希重放 |
-| `rewards.py` | episode 结束后的独立参考执行、业务约束与辅助项分解 |
-| `evaluation.py` | 数据集划分选择、批量运行、质量/效率指标、同条件版本对照 |
-| `serving.py` | FastAPI、任务/模型/轨迹端点、持久状态、容量限制 |
-| `cli.py` | 初始化、评测、重放、对照与 API 启动入口 |
+| 模块 | 当前职责 |
+| --- | --- |
+| common.py / data.py | Pydantic/TOML 契约、日志、固定 seed 的合成业务数据库、公开任务和 Verifier 注册表 |
+| agent.py | Policy 协议、确定性 fixture Policy、LocalModelPolicy、单 episode 决策循环 |
+| environment.py | reset/step、action/tool 预算、错误反馈、完成条件和最终结构化答案 |
+| tools.py / sql_worker.py | schema、业务 dictionary、只读 SQL 子进程、审计和资源上限 |
+| trajectories.py | v1.x 轨迹校验、原子保存、JSONL、数据库 hash 绑定和 replay |
+| rewards.py | 独立 reference SQL/业务约束检查；不把 SQL 可执行性当业务成功 |
+| evaluation.py | split 选择、批量运行、Task Success/Executable SQL/效率指标和同条件对照 |
+| serving.py | FastAPI loopback API、任务状态、持久 jobs/trajectory、模型 registry 和本地比较 |
+| service_config.py / service_lifecycle.py | SFT N profile 身份校验、run 分配、deadline、信号收尾、持久运行证据派生计数 |
+| model_server.py | 单卡 Transformers Qwen 服务；启动时才加载 tokenizer/model/cache/adapter |
+| grpo/ | formal rollout、TokenRecord、EvidenceStore、预算、LoRA 更新、冻结 Base/N/RL 评测和聚合 |
+| scripts/training/run_sft.py | train-only 手工 LoRA SFT pilot 入口；需要 Slurm，不能据脚本名推断 current N 已可 fresh 重训 |
+| scripts/training/run_grpo.py | formal GRPO wrapper；显式 repo/config/run，分出 CPU fake/tiny、real train、eval-only、offline closeout |
+| scripts/serving/run_sft_n_api.py | 模型子进程 + Agent API 子进程的 bounded smoke/serve supervisor |
 
-MVP 使用明确的有界 Python 状态循环。现阶段没有分叉图或复杂工作流，因此不引入 LangGraph；未来需要图编排时只替换 Runtime，保留 Environment、Policy 和轨迹契约。PostgreSQL、训练框架、模型服务端均通过后续适配器接入，不复制整个上游仓库。
+当前实现是有界 Python 状态循环和显式文件证据，不是隐式工作流服务。
 
-## Episode 状态与证据
+## Runtime、Policy 与环境
 
-`reset(PublicTask)` 清空历史、SQL 结果、检查记录与预算，返回初始 Observation。策略只获得 task_id、自然语言 prompt、可见工具历史和 seed，不获得参考查询。
+一次 episode 的输入是 PublicTask。Runtime 给 Policy 的可见信息包括 task_id、公开 prompt、observation、已返回的 schema/dictionary/SQL 结果、错误和历史 assistant 输出；Policy 不读取 reference SQL 或 expected answer。
 
-每次 `step(Action)` 返回 Observation：step_index、ok/result/error、terminated/reason、剩余 action/tool 预算及 seed 元数据。reward 字段保留为 null；隐藏终局奖励由独立 Reward Service 计算后写入轨迹，避免模型在未完成时探测参考答案。
+可用 Action 为：
 
-Action 有六种：
+1. plan：记录计划，占 action 预算，不执行工具。
+2. schema：发现业务表、字段类型、主键和外键。
+3. dictionary：查询公开业务定义和口径。
+4. sql：把 SQL 交给只读 worker；错误作为下一轮 observation 返回。
+5. check：检查列名/结果结构和已执行 SQL 的证据，不判断隐藏答案。
+6. finish：引用通过 check 的 SQL step，最终行列由环境提取，不能由模型伪造。
 
-1. `plan`：记录非空计划，不消耗工具次数，计入总 action 上限。
-2. `schema`：发现业务表、字段类型、主键和外键。
-3. `dictionary`：查询业务定义及收入口径。
-4. `sql`：执行受限查询；执行错误返回 Observation，允许下轮修复。
-5. `check`：检查已有 SQL 的列名和结果是否完整，不判断隐藏答案对错。
-6. `finish`：必须引用通过 check 的 SQL step，最终结构化列与行由环境直接提取，模型不能在 finish 中伪造 rows。
+环境保留 action/tool budget、episode timeout、每次 SQL timeout 和 terminal reason。Policy 的格式错误、SQL 错误、预算耗尽和业务错误都保留在 trajectory；“模型返回了 JSON”不等于任务成功。
 
-正常终止为 completed；预算耗尽、episode 超时、策略或执行异常均保留明确原因。总 action 预算防止通过无限 plan 绕过工具次数限制。SQL 具有独立硬超时，并受 episode 剩余时间约束；可见服务协议以有超时的 HTTP 接入本地模型。受信任 Python Policy 必须遵守 decide 的 timeout 参数；当前 Runtime 不对任意第三方 Python 插件提供进程级抢占保证。
+## 只读 SQL 与独立评分
 
-## SQL 边界
+SQL worker 运行在新 Python 子进程中，使用 read-only SQLite URI、query_only、trusted_schema 关闭、extension loading 关闭、authorizer 白名单和 rlimit。禁止 DDL/DML、ATTACH、PRAGMA、文件函数和扩展加载；默认限制 2 秒、256 MB、100 行和 64 KiB 结果。被截断或拒绝的结果不能成为完成证据。
 
-业务数据库单独存放，不包含任务答案、参考 SQL、任务状态或模型配置。Schema 工具只遍历固定五个业务表，模型不能提供 PRAGMA 字符串。SQLite 查询和 Schema 发现均在新 Python 子进程中执行，不执行任意 Python；父进程超时后由 subprocess 终止并回收子进程。
+业务数据库只保存企业业务表，不向模型暴露 reference SQL、任务答案或 Verifier 状态。独立 Reward/Verifier 在 episode 终止后执行隐藏 reference SQL、业务约束和最终答案比较；SQL 执行成功、工具调用数和 Verifier success 是不同字段。
 
-子进程启用：
+当前服务仍假设受控的本地 SQLite 与可信生成器。生产数据库需要 PostgreSQL 最小权限角色、statement timeout、部署隔离和鉴权；这些不是当前实现。
 
-- `mode=ro`、`query_only=ON`、`trusted_schema=OFF`、关闭 extension loading。
-- SQLite authorizer 仅放行 SELECT、递归查询、五个 main 业务表的 READ 和必要聚合/字符串函数；其余操作默认拒绝。SQLite 对 COUNT/覆盖索引的空列名回调单独处理。
-- 禁止 ATTACH、DDL/DML、事务/PRAGMA、系统表、文件读取函数、randomblob 和扩展加载。
-- 256 MB 地址空间、CPU 秒数限制、禁止文件增长，临时数据只在内存。
-- 默认 2 秒墙钟超时；SQL 16,000 字符、64 列、100 行、64 KiB 结果上限。超量行显式 truncated，超字节结果拒绝，不静默当完整答案使用。
-- SQL 审计保存哈希、task_id、step_index、成功/错误和耗时；完整 SQL 只在对应轨迹内，输出文件不提交 Git。
+## 模型消息与私有评分字段
 
-边界假设：数据库由受信任生成器创建，策略输出为 JSON/SQL，服务仅本地展示。SQLite authorizer 与 rlimit 不是对任意恶意数据库文件或本机进程的 OS 安全沙箱。生产升级应采用 PostgreSQL 最小权限角色、事务只读、statement_timeout、服务器资源限制和部署隔离；不要把同用户任意文件写权限暴露给策略。
+| 类别 | 内容 | 是否进入模型 messages |
+| --- | --- | --- |
+| PublicTask | task_id、公开 prompt、公开 split 元数据 | 是 |
+| Observation | schema/dictionary/SQL 工具结果、错误、预算和终止提示 | 是，按 Runtime 可见历史返回 |
+| Assistant output | 原始模型输出、解析后的 Action、格式重试消息 | 是，后续轮次可见；原始输出另存 |
+| Token evidence | prompt/generated token IDs、old/raw/behavior log-probabilities、response mask、request/response IDs | 训练证据；不是业务 prompt 的隐藏字段 |
+| Private verifier | reference SQL、expected answer、隐藏业务约束、verifier_payload | 否，只给隔离 Verifier |
+| Scoring result | RewardResult、success、reason、Verifier SQL count、technical unknown | 否，episode 后由评分路径写入 |
+| Provenance | model identity、adapter/delta hash、数据库 hash、event/trajectory/call-ledger、source kind | 否；用于审计、聚合和复现 |
 
-## 轨迹与重放
+因此，模型能看到工具返回的业务结果，但看不到“这个结果是否等于 reference answer”的评分标签。
 
-每个 episode 保存 schema_version、run_id、PublicTask、policy version/kind、数据库 SHA-256、完整 Settings、初始 Observation、逐轮前置 Observation/Action/tool arguments/result、token/时间、最终答案、终止原因和 RewardResult。工具成本可从步记录统计；JSONL 是后续训练数据入口，当前未实现 SFT 训练转换器。
+## 轨迹与持久证据
 
-保存前验证序号连续、Observation 链、工具名称/参数、完成答案与终局证据一致；临时文件写入/fsync 后原子替换。此校验保证结构一致性，不是数字签名，也不保证被任意重写的可信源文件真实性。
+每条 trajectory 绑定 schema version、run_id、PublicTask、policy identity、数据库 hash、settings、逐步 observation/action/tool result、raw model attempts、token usage、terminal reason 和 RewardResult。原子写入和 schema 校验保证结构链连续；它们不是数字签名，也不证明任意外部文件可信。
 
-重放先验证数据库哈希，再按记录的 action 重新执行并逐步比较 Observation；不重新调用模型，不比较 wall time 和 token 值。正常及错误恢复轨迹可确定性重放。资源超时具有机器依赖性，差异会报告 mismatch；策略内部异常只可重放已执行的工具前缀，terminal_reason 是采集记录，而不是声称再次重现了模型异常。涉及 SQL 日期的任务使用固定时间范围，无 NOW/random 函数。
+formal GRPO 还为每次模型尝试先写不可变 INTENT，再绑定 response、engine event、TokenRecord、Action attempt 和 trajectory。TokenRecord 要求：
 
-## 奖励与评测
+- response_mask 的 prompt token 为 0、generated response token 为 1；
+- generated token、raw policy log-probability、behavior sampling log-probability 长度相等且有限；
+- request/response/event/path hash 绑定，不用进程内计数器覆盖旧证据；
+- 缺响应、hash 冲突或不完整链在送 Verifier 前变成 technical unknown。
 
-隐藏验证器独立执行 reference_sql，与最终证据比较列名、整数金额、行及排序；无序任务使用带计数的行集合，保留重复行语义。Top-3 任务公开要求先确认订单数量，因此还验证最终证据之前存在与独立计数查询一致的 paid_orders 中间结果，并要求两次成功 SQL。仅重复最终查询不能满足该约束。主奖励必须同时满足最终正确、业务约束和正常完成。
+服务 summary/checks 的 model_calls、business_sql_calls、verifier_calls 只从有来源的持久 model event、SQL audit 或最终 trajectory 派生；主来源与 fallback 互斥。没有来源就写 null 和 reason，不把缺测写成 0；gpu_calls 与 scheduler allocation 也不凭空补零。
 
-默认成功 1，失败 0。可选工具成本、重复调用、错误惩罚总计最多将成功奖励降到 0.9。恢复奖励只按 episode 计一次，且辅助总值不得为正；因此增加错误再恢复不能比无错误路径获得更高奖励。不以另一个 LLM 打分，也不奖励刷调用次数。SQL 执行率、恢复状态、重复次数和预算单列为诊断分量。
+## SFT：train-only 轨迹到 Adapter
 
-评测质量指标为 Task Success Rate 和 Executable SQL Rate；效率指标为 Tool Error Rate、平均工具调用/latency/token、配置单价下的端到端费用。计数包括模型发起的工具尝试和环境拒绝，不把少调用当作更正确。未知 token 计量的真实模型失败轨迹显示 null，不伪造为零；费用不包含未采集的集群账单。
+SFT 监督输入只允许来自获准 train split 的实际执行 assistant Action/轨迹；validation/test 和 reference SQL 不回流模型消息。SFT 数据需保留 source task、split、数据库指纹、trajectory source 和 token/mask 摘要。
 
-对照要求相同数据库哈希、task_id 集合、seed、split、Settings 和 policy_kind，禁止将 fixture 和 LLM 报告混合对比。当前 train/validation/test 只保证任务 ID、提示词和年份参数隔离；仍共享 schema、实体与模板，样本极小，属于功能基准，不足以证明泛化。M3 前必须扩大数据并建立跨数据库/实体/模板及哈希污染检查。
+scripts/training/run_sft.py 是当前仓库中的受控单卡手工 LoRA pilot：读取 dataset JSONL 与 metadata，要求 SLURM_JOB_ID，使用固定 Qwen revision、FP16、SDPA 和 manual LoRA，并写 checkpoint/optimizer/scheduler/scaler/RNG。它不是一个隐藏下载、自动准备数据库、自动生成 current N 的全量复训器。
 
-## API 与模型端点
+当前冻结 N 的 lineage 是 T-017-R2 的 final-step-27 adapter；已记录 weight SHA-256 为 e67372df6d805d4ece08e6e698ccbe76d73cc8f83fe96b12f6c7939028f088b9，adapter config SHA-256 为 bae7f0af3379a71ae24b0386131d1728eea4ed48fef8c7a0f3ba22780ce17c22。历史训练日志和源码快照保留在对应的本地 artifacts 目录；当前源码提交不包含这些过程记录。
 
-API 单进程、loopback，容量上限 8 个待执行/执行中任务。比较请求先验证和预留整批容量，失败释放全部预留，避免出现无 worker 的 queued 作业。FastAPI BackgroundTasks 执行同步 runtime；不声称是生产分布式队列。
+## GRPO：多轮 rollout、token loss 与更新
 
-状态存于独立 jobs.sqlite3，轨迹原子落盘。重启后原 running/queued 标为 failed/server_restarted，便于人工重试；不宣称任务透明恢复。多进程部署、认证、多租户和外部队列尚未实现。
+formal GRPO 的 train 路径由 run_grpo.py train 调用 grpo.orchestration.run_online_training：
 
-本地模型通过 OpenAI 兼容 `/v1/chat/completions` 接入，生成设置可配置，默认 temperature=0、512 新 token、一次格式重试。仅允许完整 JSON 或整体 JSON fence 的受限规范化，参数错误明确分类，不补 SQL 或业务答案。M2A 新增 FP16/eager Transformers 服务，启动时检查 Slurm 计算节点及单卡分配；真实 Qwen 运行仍待授权。
+1. 按 task/group 采样多条真实多轮 episode，并保存每个模型 request 的 messages、response、token IDs 和模型身份。
+2. TokenRecord 保存 prompt/generated IDs、response-only mask、raw policy log-probabilities 和 behavior sampling log-probabilities。tool token 不被 mask 成 response loss。
+3. 对同一 task group 的终局 reward 计算组内优势，使用 sample standard deviation 加 1e-4；零方差组产生零优势并跳过对应更新。
+4. 按配置执行两轮、每轮两次 logical update；一个进程内保留 policy、optimizer、scheduler、scaler 和 RNG 状态，更新后刷新 policy snapshot。
+5. 保存 rollout fingerprint、score/index、training state、parent stack 和 final delta；资源/证据缺失时终点为 unknown 或 null。
 
-CPU 默认 episode 30 秒，Qwen 配置 episode 600 秒、decide 120 秒（含重试），SQL 独立 2 秒。v1.1 轨迹新增逐次 raw model_attempts，包含未形成合法 Action 的输出、错误和 telemetry；校验执行 Action 必须与原始生成解析结果一致。v1.0 仍可读取。60 任务多库冻结清单在 verifier 侧加载，策略只获得 PublicTask。具体指标口径和进程回收见 [M2A 运行手册](milestone-2a.md)。
+这里的上游算法是仓库内的 LocalGRPOAdapter 与本地 torch backend 适配，不是安装完整 TRL Trainer，也不是 vLLM、PEFT、Accelerate、分布式队列或外部训练服务。
 
-## 后训练边界
+## Base、N、RL 的加载身份
 
-没有训练空类或伪实现。后续 SFT 从经独立验证成功、split=train 的轨迹转换；参考查询不进入模型消息。GRPO 使用真实环境多轮 rollout，按 task 分组采样，将终局奖励和 response-only token mask 交给经过验证的上游算法。需要额外记录 rollout token IDs/logprobs、采样配置、checkpoint revision、optimizer/scheduler/scaler/RNG 状态与训练信号恢复；这些字段目前尚未实现，不能把现有 JSON action 轨迹直接称为完整 RL 训练数据。
+冻结评测和正式对照都要求每个 arm 从同一 fresh Base revision 开始；评测时不把上一个 arm 的内存对象继续使用。
+
+| Arm | fresh model load | adapter merge | 解释 |
+| --- | --- | --- | --- |
+| Base | Qwen base 一次 | 0 | 未训练对照 |
+| N | Qwen base 一次 | parent N 一次 | SFT N |
+| RL | Qwen base 一次 | parent N 一次，再 fixed final delta 一次 | N 的 GRPO delta；不是独立 Base→RL 替代模型 |
+
+当前固定身份为 Qwen/Qwen2.5-1.5B-Instruct revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306，V100 路径为 FP16 + sdpa_math。T-023/E-025 的 final-delta 由冻结评测 TOML 以 hash 绑定；fresh checkout 没有该 parent/delta 时不能声称可加载 RL。
+
+## 评测与 unknown 口径
+
+E-026 的三臂评测固定 20 项 validation panel、greedy temperature 0、seed 17、相同 Runtime/Verifier 边界。每个 arm 单独要求 planned=qualified=scored=20、unknown=0；业务失败是已评分的 false，不是 unknown。
+
+pair gate 独立计算：
+
+- N−Base 只依赖 Base 与 N 两臂完整；
+- RL−N 只依赖 N 与 RL 两臂完整；
+- RL−Base 只依赖 RL 与 Base 两臂完整；
+- global three-arm COMPLETE 仍要求 Base、N、RL 三臂和三个 pair 都完整。
+
+因此，一个缺失的 RL 结果不能把已经完整的 N−Base 变成 null；反过来，global 三臂仍会保持 incomplete。成功率、SQL Action/SQL_OK、Runtime worker、Verifier 调用和技术 unknown 分开报告。E-026 当前结果为 Base 0/20、N 8/20、RL 8/20，unknown 均为 0；这只支持该冻结 panel 的有限结论。
+
+## API、模型服务与部署边界
+
+Agent API 是单进程 loopback FastAPI，状态和轨迹持久化到 run-local SQLite/JSON；模型服务是单卡 Transformers HTTP 端点。SFT N launcher 负责启动、ready、smoke/serve、deadline、signal 和子进程组收尾，持久化 model event、trajectory、SQL audit、summary/checks 与 allocation/wall 分离。
+
+当前没有 LangGraph、vLLM、完整 TRL Trainer、PostgreSQL 后端、外部分布式队列、认证、多租户、常驻公网部署或跨 Job 自动资源累计。E-027 只证明单 V100 上固定 N 的两项 train HTTP smoke；T-028 的新增 smoke/serve/lifecycle 证明是 CPU 合同，不是新的 V100 或生产部署证明。
