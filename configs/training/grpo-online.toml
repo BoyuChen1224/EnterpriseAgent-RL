@@ -1,0 +1,111 @@
+# T-022 formal online GRPO entrypoint. Paths are explicit inputs; this file
+# does not imply that parent or validation assets are read by CPU validation.
+
+[run]
+run_id = "grpo-online"
+training_seed = 42
+
+[model]
+model_id = "Qwen/Qwen2.5-1.5B-Instruct"
+revision = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+cache_dir = "artifacts/model-cache"
+max_context_tokens = 8192
+attention_backend = "sdpa_math"
+parent_adapter = "artifacts/sft-runtime-aligned-decision-pilot/t017-r2-v1/training/checkpoints/final-step-27/adapter"
+parent_adapter_sha256 = "e67372df6d805d4ece08e6e698ccbe76d73cc8f83fe96b12f6c7939028f088b9"
+parent_adapter_config_sha256 = "bae7f0af3379a71ae24b0386131d1728eea4ed48fef8c7a0f3ba22780ce17c22"
+
+[lora]
+rank = 8
+alpha = 16
+dropout = 0.0
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+
+[rollout]
+rounds = 2
+updates_per_round = 2
+group_count = 4
+samples_per_task = 4
+seed_start = 74
+seed_end = 105
+
+[rollout.generation]
+temperature = 1.0
+top_p = 1.0
+top_k = 0
+max_tokens = 512
+format_retries = 1
+parse_mode = "json_fence"
+
+[runtime]
+seed = 17
+max_actions = 20
+max_tool_calls = 14
+episode_timeout_s = 600.0
+inference_timeout_s = 120.0
+sql_timeout_s = 2.0
+sql_max_rows = 100
+sql_max_bytes = 65536
+sql_memory_mb = 256
+step_penalty = 0.0
+repeat_penalty = 0.0
+error_penalty = 0.0
+recovery_bonus = 0.0
+token_price_per_million = 0.0
+tool_price = 0.0
+
+[optimizer]
+learning_rate = 0.000002
+betas = [0.9, 0.999]
+eps = 0.00000001
+weight_decay = 0.0
+foreach = false
+fused = false
+clip_norm = 1.0
+epsilon = 0.2
+beta = 0.0
+grad_scaler_init = 4096.0
+grad_scaler_backoff = 0.0625
+grad_scaler_growth_interval = 1000
+max_amp_skip_replays = 1
+
+[budget]
+allocated_gpu_count = 1
+job_hard_seconds = 3600
+run_hard_seconds = 3900
+soft_seconds = 3300
+cleanup_reserve_seconds = 60
+
+[data]
+train_index = "inputs/grpo/train-index.json"
+
+[evaluation]
+evaluation_plan = "inputs/grpo/evaluation-plan.json"
+public_panel = "inputs/grpo/public-panel.jsonl"
+
+[evaluation.generation]
+temperature = 0.0
+top_p = 1.0
+top_k = 0
+max_tokens = 512
+format_retries = 1
+parse_mode = "json_fence"
+seed = 17
+
+[limits]
+model_requests = 960
+forward_backward = 1600
+optimizer_update_attempts = 8
+successful_optimizer_updates = 4
+amp_skip_replays = 1
+verifier_calls = 24
+verifier_sql = 48
+
+[slurm]
+account = "pi_daipeishan"
+qos = "gpuq"
+partition = "gpu4RQ"
+cpus_per_task = 2
+memory = "16G"
+gpus = 1
+time_minutes = 60

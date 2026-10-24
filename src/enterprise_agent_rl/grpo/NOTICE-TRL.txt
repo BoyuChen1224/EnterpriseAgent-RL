@@ -1,0 +1,14 @@
+Third-party attribution
+
+Copyright 2025 The HuggingFace Team. All rights reserved.
+
+The GRPO loss and grouped-advantage ordering in upstream.py are a local,
+dependency-free adaptation of the corresponding TRL v0.16.1 GRPOTrainer
+source body. The adaptation is modified for EnterpriseAgent-RL's manual
+Qwen backend and does not import or install TRL, Accelerate, or PEFT.
+
+Upstream project: Hugging Face TRL
+Source version: v0.16.1
+Source URL: https://github.com/huggingface/trl/blob/v0.16.1/trl/trainer/grpo_trainer.py
+License: Apache License 2.0
+The complete upstream license is retained alongside this notice in LICENSE-TRL.txt.
