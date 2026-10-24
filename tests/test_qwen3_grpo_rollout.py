@@ -406,6 +406,21 @@ def test_reference_sql_audit_ignores_model_generated_assistant_history(tmp_path)
     assert scan["assistant_generated_matches"] == ["requests/assistant.json"]
 
 
+def test_artifact_manifest_excludes_source_snapshot_and_mutable_command_ledger(tmp_path):
+    from scripts.evaluation.run_qwen3_grpo_rollout import _write_artifact_manifest
+
+    (tmp_path / "result.json").write_text('{"ok": true}\n', encoding="utf-8")
+    (tmp_path / "commands.json").write_text('{}\n', encoding="utf-8")
+    (tmp_path / "source-snapshot").mkdir()
+    (tmp_path / "source-snapshot/manifest.json").write_text('{}\n', encoding="utf-8")
+
+    manifest = _write_artifact_manifest(tmp_path)
+    assert manifest["file_count"] == 1
+    assert manifest["files"][0]["path"] == "result.json"
+    assert not any(row["path"].startswith("source-snapshot/") for row in manifest["files"])
+    assert (tmp_path / "artifact-manifest.json").is_file()
+
+
 class _FakeTokenizer:
     chat_template = "{{ messages }}"
     pad_token_id = 0

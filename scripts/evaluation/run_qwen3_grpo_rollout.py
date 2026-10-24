@@ -1425,6 +1425,39 @@ def _scan_reference_sql_policy_inputs(
     }
 
 
+def _write_artifact_manifest(run_dir: Path) -> dict[str, Any]:
+    """Index immutable run outputs while keeping source and command ledgers separate."""
+    excluded = {"artifact-manifest.json", "commands.json"}
+    entries = []
+    for path in sorted(run_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(run_dir)
+        if relative.as_posix() in excluded or relative.parts[0] == "source-snapshot":
+            continue
+        entries.append(
+            {
+                "path": relative.as_posix(),
+                "bytes": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+        )
+    manifest = {
+        "schema_version": "t033-artifact-manifest-v1",
+        "scope": "run-artifacts-excluding-source-snapshot-and-mutable-command-ledger",
+        "source_snapshot_manifest": "source-snapshot/manifest.json",
+        "excluded_paths": [
+            "artifact-manifest.json",
+            "commands.json",
+            "source-snapshot/**",
+        ],
+        "files": entries,
+        "file_count": len(entries),
+    }
+    _write_json(run_dir / "artifact-manifest.json", manifest)
+    return manifest
+
+
 def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
     preflight = read_json(paths["run"] / "preflight.json")
     if not isinstance(preflight, dict) or preflight.get("status") != "PASSED":
@@ -1734,11 +1767,13 @@ def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
             "",
             (
                 f"绝对产物路径：`{paths['run']}`。详见 `checks.json`、`metrics.json`、"
-                "`group-metrics.json`、`allocation-ledger.json` 和 `job-chain.json`。"
+                "`group-metrics.json`、`allocation-ledger.json`、`job-chain.json` 和 "
+                "`artifact-manifest.json`."
             ),
         ]
     )
     (paths["run"] / "report.md").write_text("\n".join(report_lines) + "\n", encoding="utf-8")
+    _write_artifact_manifest(paths["run"])
     return metrics
 
 
