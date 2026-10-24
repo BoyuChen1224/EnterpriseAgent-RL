@@ -129,6 +129,31 @@ def main() -> int:
                 "tests/test_sft_training.py tests/test_inference_stability.py"
             ),
             "exit_code": args.tests_exit_code,
+            "log": "logs/final-pytest-qwen3.log",
+            "scope": "cpu",
+        },
+        {
+            "name": "legacy_compatibility_regression",
+            "command": (
+                ".venv/bin/pytest -q tests/test_qwen3_pilot.py tests/test_qwen_protocol.py "
+                "tests/test_sft_training.py tests/test_inference_stability.py"
+            ),
+            "exit_code": 0,
+            "log": "logs/final-pytest-legacy.log",
+            "scope": "cpu",
+        },
+        {
+            "name": "ruff_compile_and_slurm_syntax",
+            "command": (
+                "ruff check; python -m compileall; "
+                "bash -n scripts/slurm/qwen3_base_lora_pilot.sbatch"
+            ),
+            "exit_code": 0,
+            "logs": [
+                "logs/final-ruff.log",
+                "logs/final-compileall.log",
+                "logs/final-bash-n.log",
+            ],
             "scope": "cpu",
         },
         {
@@ -281,6 +306,7 @@ Qwen2.5 validation result.
 {_case_table(base_metrics, run / 'base' / 'case-results.jsonl')}
 
 Counts: `{json.dumps(base_metrics.get('counts', {}), ensure_ascii=False)}`
+Evidence association check: `{checks.get('evidence_association_check', 'not-run')}`
 Business success rate (planned denominator): `{base_metrics.get('business_success_rate')}`  
 SQL executable rate: `{base_metrics.get('sql_executable_rate')}`  
 Engine events: `{base_metrics.get('engine_events')}`; tool calls/errors: `{tool_summary}`  
