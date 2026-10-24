@@ -746,29 +746,35 @@ def _prepare(paths: dict[str, Path]) -> dict[str, Any]:
     _write_json(paths["run"] / "frozen-config.json", frozen)
     guard = _budget(paths, config)
     guard.current("preflight-complete")
-    _write_json(
-        paths["run"] / "job-chain.json",
-        {
-            "schema_version": "t033-job-chain-v1",
-            "task": "T-033/E-030",
-            "jobs": [],
-            "at_most_one_executable_job": True,
-            "pending_replacements": [],
-            "training_jobs": 0,
-        },
-    )
-    _write_json(
-        paths["run"] / "allocation-ledger.json",
-        {
-            "schema_version": "t033-allocation-ledger-v1",
-            "slurm_root_allocation_seconds": None,
-            "budget_accounted_gpu_seconds": 0.0,
-            "budget_accounted_gpu_minutes": 0.0,
-            "wrapper_elapsed_seconds": None,
-            "currency_cost": None,
-            "source": "not_started",
-        },
-    )
+    existing_job_chain = read_json(paths["run"] / "job-chain.json", {}) or {}
+    if not isinstance(existing_job_chain, dict) or not existing_job_chain.get("jobs"):
+        _write_json(
+            paths["run"] / "job-chain.json",
+            {
+                "schema_version": "t033-job-chain-v1",
+                "task": "T-033/E-030",
+                "jobs": [],
+                "at_most_one_executable_job": True,
+                "pending_replacements": [],
+                "training_jobs": 0,
+            },
+        )
+    existing_allocation = read_json(paths["run"] / "allocation-ledger.json", {}) or {}
+    if not isinstance(existing_allocation, dict) or not existing_allocation.get(
+        "slurm_root_rows"
+    ):
+        _write_json(
+            paths["run"] / "allocation-ledger.json",
+            {
+                "schema_version": "t033-allocation-ledger-v1",
+                "slurm_root_allocation_seconds": None,
+                "budget_accounted_gpu_seconds": 0.0,
+                "budget_accounted_gpu_minutes": 0.0,
+                "wrapper_elapsed_seconds": None,
+                "currency_cost": None,
+                "source": "not_started",
+            },
+        )
     checks = {
         "schema_version": "t033-checks-v1",
         "phase": "preflight",
