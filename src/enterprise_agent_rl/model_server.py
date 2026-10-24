@@ -13,6 +13,7 @@ import tomllib
 import uuid
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -30,6 +31,7 @@ from enterprise_agent_rl.inference_stability import (
 )
 from enterprise_agent_rl.lora import merge_lora_adapter
 from enterprise_agent_rl.model_protocol import GenerationSettings
+from enterprise_agent_rl.service_config import ServiceProfile, sha256_file
 
 
 class ModelSettings(Contract):
@@ -82,12 +84,21 @@ class QwenEngine:
         cache: Path,
         output: Path,
         adapter: Path | None = None,
+        service_profile: ServiceProfile | None = None,
     ):
         require_compute_node()
         import torch
         import transformers
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
+        if service_profile is not None:
+            service_profile.preflight(check_database=False, check_benchmark_records=False)
+            if cfg.model_id != service_profile.model_id or cfg.revision != service_profile.revision:
+                raise RuntimeError("profile_model_identity_mismatch")
+            if cache.resolve() != service_profile.cache_dir.resolve():
+                raise RuntimeError("profile_cache_path_mismatch")
+            if adapter is None:
+                raise RuntimeError("profile_adapter_required")
         self.torch, self.cfg = torch, cfg
         self.events = output / "generations.jsonl"
         output.mkdir(parents=True, exist_ok=True)
@@ -139,7 +150,17 @@ class QwenEngine:
         if getattr(self.model.generation_config, "remove_invalid_values", False):
             raise RuntimeError("generation_config_non_finite_repair_enabled")
         adapter_metadata = None
+        adapter_sha256 = None
+        adapter_config_sha256 = None
+        adapter_merge_count = 0
         if adapter is not None:
+            adapter_sha256 = sha256_file(adapter / "adapter_model.safetensors")
+            adapter_config_sha256 = sha256_file(adapter / "adapter_config.json")
+            if service_profile is not None and (
+                adapter_sha256 != service_profile.adapter_sha256
+                or adapter_config_sha256 != service_profile.adapter_config_sha256
+            ):
+                raise RuntimeError("profile_adapter_identity_mismatch")
             adapter_metadata = merge_lora_adapter(
                 self.model,
                 adapter,
@@ -152,6 +173,13 @@ class QwenEngine:
                 for parameter in self.model.parameters()
             ):
                 raise RuntimeError("adapter_merge_produced_non_finite_weights")
+            adapter_metadata.update(
+                {
+                    "adapter_sha256": adapter_sha256,
+                    "adapter_config_sha256": adapter_config_sha256,
+                }
+            )
+            adapter_merge_count = 1
         model_dtype = str(next(self.model.parameters()).dtype)
         gpu_name = torch.cuda.get_device_name(0)
         compute_capability = list(capability)
@@ -164,6 +192,7 @@ class QwenEngine:
         self.backend_control = backend_control
         self.metadata = {
             "model": cfg.model_dump(),
+            "model_id": cfg.model_id,
             "model_revision": cfg.revision,
             "model_dtype": model_dtype,
             "device": self.device,
@@ -196,8 +225,30 @@ class QwenEngine:
             },
             "adapter": adapter_metadata,
             "adapter_path": str(adapter) if adapter is not None else None,
+            "adapter_sha256": adapter_sha256,
+            "adapter_config_sha256": adapter_config_sha256,
+            "base_model_load_count": 1,
+            "adapter_merge_count": adapter_merge_count,
+            "service_profile": (
+                {
+                    "profile_id": service_profile.profile_id,
+                    "model_version": service_profile.model_version,
+                }
+                if service_profile is not None
+                else None
+            ),
+            "profile_id": service_profile.profile_id if service_profile is not None else None,
+            "model_version": service_profile.model_version if service_profile is not None else None,
+            "model_completion_endpoint": (
+                service_profile.model_completion_endpoint if service_profile is not None else None
+            ),
+            "model_health_endpoint": (
+                service_profile.model_health_endpoint if service_profile is not None else None
+            ),
         }
-        (output / "model-load.json").write_text(json.dumps(self.metadata, indent=2) + "\n")
+        model_load_path = output / "model-load.json"
+        self.metadata["model_load_path"] = str(model_load_path)
+        model_load_path.write_text(json.dumps(self.metadata, indent=2) + "\n")
 
     def _base_telemetry(self) -> dict:
         return {
@@ -248,6 +299,7 @@ class QwenEngine:
             "diagnostic_context": None,
             "telemetry": self._base_telemetry(),
         }
+        event["telemetry"]["event_id"] = event["id"]
         inputs = generated = new_tokens = None
         torch.cuda.reset_peak_memory_stats()
         try:
@@ -399,6 +451,24 @@ def create_model_app(engine) -> FastAPI:
     def health():
         return {"status": "ready", "metadata": engine.metadata}
 
+    @app.get("/models")
+    def models():
+        metadata = engine.metadata
+        return {
+            "models": [
+                {
+                    "model": metadata.get("model_id")
+                    or metadata.get("model", {}).get("model_id"),
+                    "model_version": metadata.get("model_version"),
+                    "profile_id": metadata.get("profile_id"),
+                    "revision": metadata.get("model_revision")
+                    or metadata.get("model", {}).get("revision"),
+                    "adapter_sha256": metadata.get("adapter_sha256"),
+                    "adapter_config_sha256": metadata.get("adapter_config_sha256"),
+                }
+            ]
+        }
+
     @app.post("/v1/chat/completions")
     def complete(request: CompletionRequest):
         if not lock.acquire(blocking=False):
@@ -414,30 +484,59 @@ def create_model_app(engine) -> FastAPI:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=Path, default=Path("configs/model/qwen2.5-1.5b.toml"))
-    parser.add_argument("--cache", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument("--profile", type=Path)
+    parser.add_argument("--repo-root", type=Path)
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--cache", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--port", type=int)
+    parser.add_argument("--model-endpoint")
+    parser.add_argument("--health-endpoint")
     parser.add_argument("--adapter", type=Path)
     args = parser.parse_args()
     require_compute_node()
-    args.output.mkdir(parents=True, exist_ok=True)
+    profile = None
+    if args.profile is not None:
+        profile = ServiceProfile.load(args.profile, repo_root=args.repo_root)
+        if args.config is not None or args.cache is not None or args.adapter is not None:
+            raise SystemExit("--profile fixes --config/--cache/--adapter")
+        output = args.output.resolve() if args.output is not None else profile.output_dir
+        profile = profile.with_paths(output=output).with_endpoints(
+            model_completion=args.model_endpoint,
+            model_health=args.health_endpoint,
+        )
+        config_path = profile.model_config_path
+        cache = profile.cache_dir
+        adapter = profile.adapter_dir
+        port = args.port or int(urlparse(profile.model_completion_endpoint).port or 8001)
+    else:
+        config_path = args.config or Path("configs/model/qwen2.5-1.5b.toml")
+        if args.cache is None or args.output is None:
+            raise SystemExit("--cache and --output are required without --profile")
+        cache = args.cache
+        output = args.output
+        adapter = args.adapter
+        port = args.port or 8001
+    if profile is not None:
+        profile.preflight(check_database=False, check_benchmark_records=False)
+    output.mkdir(parents=True, exist_ok=True)
     try:
         engine = QwenEngine(
-            ModelSettings.load(args.config),
-            args.cache,
-            args.output,
-            args.adapter,
+            ModelSettings.load(config_path),
+            cache,
+            output,
+            adapter,
+            profile,
         )
     except Exception as exc:
         append_event(
-            args.output / "startup-errors.jsonl",
+            output / "startup-errors.jsonl",
             {"code": "model_load_failed", "type": type(exc).__name__, "message": str(exc)[:1000]},
         )
         raise
     import uvicorn
 
-    uvicorn.run(create_model_app(engine), host="127.0.0.1", port=args.port, workers=1)
+    uvicorn.run(create_model_app(engine), host="127.0.0.1", port=port, workers=1)
 
 
 if __name__ == "__main__":

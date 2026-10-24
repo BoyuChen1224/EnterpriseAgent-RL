@@ -11,6 +11,7 @@ from enterprise_agent_rl.common import Settings, configure_logging
 from enterprise_agent_rl.data import benchmark_tasks, initialize_database
 from enterprise_agent_rl.evaluation import compare_reports, evaluate
 from enterprise_agent_rl.model_protocol import GenerationSettings
+from enterprise_agent_rl.service_config import ServiceProfile
 from enterprise_agent_rl.serving import create_app
 from enterprise_agent_rl.trajectories import TrajectoryStore, replay
 
@@ -42,15 +43,31 @@ def main() -> None:
     cp.add_argument("reports", type=Path, nargs="+")
     cp.add_argument("--output", type=Path, default=Path("artifacts/comparison.json"))
     api = sub.add_parser("serve")
-    api.add_argument("--database", type=Path, default=Path("artifacts/business.sqlite3"))
-    api.add_argument("--output", type=Path, default=Path("artifacts/api"))
+    api.add_argument("--database", type=Path)
+    api.add_argument("--output", type=Path)
     api.add_argument("--port", type=int, default=8000)
+    api.add_argument("--profile", type=Path)
+    api.add_argument("--repo-root", type=Path)
+    api.add_argument("--model-endpoint")
+    api.add_argument("--model-health-endpoint")
     api.add_argument("--local-endpoint")
     api.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct")
     api.add_argument("--policy-version", default="local-untrained")
     args = parser.parse_args()
     configure_logging()
-    settings = Settings.load(args.config)
+    profile = None
+    if args.command == "serve" and args.profile is not None:
+        profile = ServiceProfile.load(args.profile, repo_root=args.repo_root)
+        profile = profile.with_paths(
+            database=args.database,
+            output=args.output,
+        ).with_endpoints(
+            model_completion=args.model_endpoint,
+            model_health=args.model_health_endpoint,
+        )
+        settings = profile.runtime
+    else:
+        settings = Settings.load(args.config)
     if args.command == "init-db":
         print(initialize_database(args.database, settings.seed))
     elif args.command == "evaluate":
@@ -87,13 +104,37 @@ def main() -> None:
     elif args.command == "serve":
         import uvicorn
 
-        policies = None
-        if args.local_endpoint:
-            # Fail fast on the login node before binding a server.
-            local = LocalModelPolicy(args.local_endpoint, args.model, args.policy_version)
-            policies = {local.version: lambda: local}
+        if profile is not None:
+            if args.local_endpoint or args.model != "Qwen/Qwen2.5-1.5B-Instruct":
+                raise SystemExit("--profile fixes the local model endpoint and model identity")
+            local = LocalModelPolicy(
+                profile.model_completion_endpoint,
+                profile.model_id,
+                profile.model_version,
+                profile.generation,
+            )
+            policies = {profile.model_version: lambda: local}
+            app = create_app(
+                profile.database_path,
+                profile.output_dir,
+                profile.runtime,
+                policies,
+                profile=profile,
+                benchmark_registry=profile.load_benchmark_registry(),
+            )
+        else:
+            database = args.database or Path("artifacts/business.sqlite3")
+            output = args.output or Path("artifacts/api")
+            policies = None
+            if args.profile or args.model_endpoint or args.model_health_endpoint:
+                raise SystemExit("--profile is required for explicit service endpoints")
+            if args.local_endpoint:
+                # Fail fast on the login node before binding a server.
+                local = LocalModelPolicy(args.local_endpoint, args.model, args.policy_version)
+                policies = {local.version: lambda: local}
+            app = create_app(database, output, settings, policies)
         uvicorn.run(
-            create_app(args.database, args.output, settings, policies),
+            app,
             host="127.0.0.1",
             port=args.port,
             workers=1,

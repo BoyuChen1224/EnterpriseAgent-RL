@@ -1,0 +1,54 @@
+profile_id = "sft-n-step27"
+model_version = "sft-n-step27"
+model_id = "Qwen/Qwen2.5-1.5B-Instruct"
+revision = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+
+[paths]
+model_config = "configs/model/qwen2.5-1.5b.toml"
+cache = "artifacts/model-cache"
+adapter = "artifacts/sft-runtime-aligned-decision-pilot/t017-r2-v1/training/checkpoints/final-step-27/adapter"
+benchmark_records = "artifacts/grpo-online-training/t021-v1/verifier-only/train1-records.json"
+database = "artifacts/grpo-online-training/t021-v1/databases/train-1.sqlite3"
+output = "artifacts/sft-n-api-integration/t026-v1"
+
+[endpoints]
+model_completion = "http://127.0.0.1:8001/v1/chat/completions"
+model_health = "http://127.0.0.1:8001/health"
+agent = "http://127.0.0.1:8000"
+
+[identity]
+adapter_sha256 = "e67372df6d805d4ece08e6e698ccbe76d73cc8f83fe96b12f6c7939028f088b9"
+adapter_config_sha256 = "bae7f0af3379a71ae24b0386131d1728eea4ed48fef8c7a0f3ba22780ce17c22"
+benchmark_records_sha256 = "88259942516ea57396bb0f17660804cab945e3e8210e36bb6da15f0686c151dc"
+database_physical_sha256 = "99e56b8f6511219eaecf19b50668ae02effb03d2533737d8dd3da4f7d65451bf"
+database_content_sha256 = "01b0da1528d8cef072cf10f801039dd4a5d3849744bf2f69b485734d018ad4eb"
+benchmark_task_ids = ["train-1-schema", "train-1-empty"]
+
+[generation]
+temperature = 0.0
+top_p = 1.0
+max_tokens = 512
+format_retries = 1
+parse_mode = "json_fence"
+seed = 17
+
+[runtime]
+seed = 17
+max_actions = 20
+max_tool_calls = 14
+episode_timeout_s = 600.0
+inference_timeout_s = 120.0
+sql_timeout_s = 2.0
+sql_max_rows = 100
+sql_max_bytes = 65536
+sql_memory_mb = 256
+step_penalty = 0.0
+repeat_penalty = 0.0
+error_penalty = 0.0
+recovery_bonus = 0.0
+token_price_per_million = 0.0
+tool_price = 0.0
+
+[service]
+model_load_timeout_s = 300.0
+health_timeout_s = 10.0
