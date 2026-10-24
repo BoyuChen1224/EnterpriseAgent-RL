@@ -1,0 +1,135 @@
+# T-024/E-026: one frozen, eval-only Base/N/RL protocol.  The data.train_index
+# value is metadata for compatibility only; the eval-only CLI never loads it.
+
+[run]
+run_id = "t024-e026"
+training_seed = 17
+
+[model]
+model_id = "Qwen/Qwen2.5-1.5B-Instruct"
+revision = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+cache_dir = "artifacts/model-cache"
+max_context_tokens = 8192
+attention_backend = "sdpa_math"
+parent_adapter = "artifacts/sft-runtime-aligned-decision-pilot/t017-r2-v1/training/checkpoints/final-step-27/adapter"
+parent_adapter_sha256 = "e67372df6d805d4ece08e6e698ccbe76d73cc8f83fe96b12f6c7939028f088b9"
+parent_adapter_config_sha256 = "bae7f0af3379a71ae24b0386131d1728eea4ed48fef8c7a0f3ba22780ce17c22"
+
+[lora]
+rank = 8
+alpha = 16
+dropout = 0.0
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+
+[rollout]
+rounds = 2
+updates_per_round = 2
+group_count = 4
+samples_per_task = 4
+seed_start = 74
+seed_end = 105
+
+[rollout.generation]
+temperature = 1.0
+top_p = 1.0
+top_k = 0
+max_tokens = 512
+format_retries = 1
+parse_mode = "json_fence"
+
+[runtime]
+seed = 17
+max_actions = 20
+max_tool_calls = 14
+episode_timeout_s = 600.0
+inference_timeout_s = 120.0
+sql_timeout_s = 2.0
+sql_max_rows = 100
+sql_max_bytes = 65536
+sql_memory_mb = 256
+step_penalty = 0.0
+repeat_penalty = 0.0
+error_penalty = 0.0
+recovery_bonus = 0.0
+token_price_per_million = 0.0
+tool_price = 0.0
+
+[optimizer]
+learning_rate = 0.000002
+betas = [0.9, 0.999]
+eps = 0.00000001
+weight_decay = 0.0
+foreach = false
+fused = false
+clip_norm = 1.0
+epsilon = 0.2
+beta = 0.0
+grad_scaler_init = 4096.0
+grad_scaler_backoff = 0.0625
+grad_scaler_growth_interval = 1000
+max_amp_skip_replays = 1
+
+[budget]
+allocated_gpu_count = 1
+job_hard_seconds = 3000
+run_hard_seconds = 3300
+soft_seconds = 2700
+cleanup_reserve_seconds = 60
+
+[data]
+train_index = "artifacts/grpo-online-training/t021-v1/verifier-only/train1-records.json"
+
+[evaluation]
+evaluation_plan = "artifacts/grpo-online-training/t021-v1/validation/validation-plan.json"
+public_panel = "artifacts/grpo-online-training/t021-v1/validation/public-panel.jsonl"
+evaluation_database_root = "artifacts/grpo-online-training/t021-v1/validation/databases"
+evaluation_plan_sha256 = "ccdb2b02f715e9496905d95a9a9737fed3b3858c865f5e0dcd1f9fe302cf52bb"
+public_panel_sha256 = "bf2b1e2795ed70284cef7d33ba928a317f928f6f8f4fc9ec9207abc4c8166bb5"
+tokenizer_raw_template_sha256 = "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f"
+tokenizer_canonical_json_sha256 = "2e2d2512cfe46af53dc1eed45368ecaab26ac4461c480e6b69fe571cf0ceaa75"
+tokenizer_raw_template_bytes = 2507
+tokenizer_canonical_json_bytes = 2629
+database_physical_sha256 = { "validation-0" = "3a16d5bdc8a8202b41e8722ff170688cc17d3c617ccdca656af230271668fd53", "validation-1" = "7c9501257be13290c97b33cc59c72f0e496d1918b2d5453fccd18078a2040c75" }
+database_logical_fingerprint = { "validation-0" = "179b6e216c0149abfa1f7fe9bb1042593f62255048fdc62257088a6c6c6ba6eb", "validation-1" = "5fd46ef8f2c41d02a88cb826e306c30f29ee6636cdd48697dd2eb949ebe92c32" }
+rl_delta_adapter = "artifacts/grpo-formal-entrypoint-validation/t023-v1/real-run/training/final-delta"
+rl_delta_sha256 = "143b1b2f8d5fec2121545e808e24716c0f6363657df36d7f257108cd27e47988"
+rl_delta_config_sha256 = "71982d7ca1a72368fa46c2a4982203a77d2e8e2476fd57796d8d428e4cf7a308"
+rl_delta_semantic_fingerprint = "afa0300ddd9f74b2fde852925350d9c92f9ef5d955f46e5af3d321c2eea8d33e"
+protocol_hash = "t024-e026-frozen-protocol-v1"
+task_ids = [
+  "validation-0-schema", "validation-0-region", "validation-0-top", "validation-0-customer",
+  "validation-0-product", "validation-0-empty", "validation-0-constraints", "validation-0-recovery",
+  "validation-0-status", "validation-0-monthly", "validation-1-schema", "validation-1-region",
+  "validation-1-top", "validation-1-customer", "validation-1-product", "validation-1-empty",
+  "validation-1-constraints", "validation-1-recovery", "validation-1-status", "validation-1-monthly",
+]
+
+[evaluation.generation]
+temperature = 0.0
+top_p = 1.0
+top_k = 0
+max_tokens = 512
+format_retries = 1
+parse_mode = "json_fence"
+seed = 17
+
+[limits]
+model_requests = 2400
+forward_backward = 1
+optimizer_update_attempts = 1
+successful_optimizer_updates = 1
+amp_skip_replays = 1
+verifier_calls = 60
+verifier_sql = 120
+accepted_actions = 1200
+tool_actions = 900
+runtime_workers = 840
+
+[slurm]
+account = "pi_daipeishan"
+qos = "gpuq"
+partition = "gpu4RQ"
+cpus_per_task = 2
+memory = "16G"
+gpus = 1
+time_minutes = 50
