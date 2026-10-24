@@ -50,6 +50,7 @@ def build_manifest(cache: Path, config: Path) -> dict:
             cache_dir=cache,
             allow_patterns=["*.json", "*.txt", "*.model", "*.safetensors", "LICENSE"],
             resume_download=True,
+            max_workers=1,
         )
     )
     files = cache_file_manifest(snapshot)
