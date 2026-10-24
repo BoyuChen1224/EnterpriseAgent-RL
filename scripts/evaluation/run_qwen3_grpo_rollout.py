@@ -1386,6 +1386,39 @@ def _group_metrics(
     }
 
 
+def _scan_reference_sql_policy_inputs(
+    request_root: Path, private_sql: list[str], run_root: Path
+) -> dict[str, list[str]]:
+    """Check private SQL against model-input messages, not model-generated history.
+
+    Each persisted generation request contains the preceding assistant action so the
+    next request is reproducible. A model can independently emit the exact
+    benchmark SQL; treating that assistant output as an injected private value
+    would be a false positive. System/user/tool-observation messages are the
+    policy inputs that this audit must protect.
+    """
+    input_matches: set[str] = set()
+    assistant_matches: set[str] = set()
+    for request_path in sorted(request_root.glob("*.json")):
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        relative = str(request_path.relative_to(run_root))
+        for message in request.get("messages") or []:
+            if not isinstance(message, dict):
+                continue
+            content = str(message.get("content") or "")
+            for sql in private_sql:
+                if not sql or sql not in content:
+                    continue
+                if message.get("role") == "assistant":
+                    assistant_matches.add(relative)
+                else:
+                    input_matches.add(relative)
+    return {
+        "non_assistant_input_matches": sorted(input_matches),
+        "assistant_generated_matches": sorted(assistant_matches),
+    }
+
+
 def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
     preflight = read_json(paths["run"] / "preflight.json")
     if not isinstance(preflight, dict) or preflight.get("status") != "PASSED":
@@ -1423,14 +1456,9 @@ def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
             raise RolloutSignalError(f"non_real_score_source:{row.get('episode_id')}")
     private_rows = read_jsonl(paths["run"] / "panel" / "private" / "verifier-inputs.jsonl")
     private_sql = [row["benchmark_task"]["reference_sql"] for row in private_rows]
-    request_leaks = []
     request_root = paths["run"] / "engine-evidence" / "requests"
-    for request_path in sorted(request_root.glob("*.json")):
-        request = json.loads(request_path.read_text(encoding="utf-8"))
-        messages = json.dumps(request.get("messages"), ensure_ascii=False)
-        for sql in private_sql:
-            if sql and sql in messages:
-                request_leaks.append(str(request_path.relative_to(paths["run"])))
+    policy_sql_scan = _scan_reference_sql_policy_inputs(request_root, private_sql, paths["run"])
+    request_leaks = policy_sql_scan["non_assistant_input_matches"]
     evidence = evidence_journal_summary(paths["run"])
     budget_state = read_json(paths["run"] / "budget-state.json", {}) or {}
     counters = dict(budget_state.get("call_counters") or {})
@@ -1514,9 +1542,10 @@ def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
                 "evidence": evidence,
             },
             {
-                "name": "reference_sql_not_in_policy_messages",
+                "name": "reference_sql_not_in_non_assistant_policy_inputs",
                 "status": "PASS" if not request_leaks else "FAIL",
                 "leaks": request_leaks,
+                "assistant_generated_matches": policy_sql_scan["assistant_generated_matches"],
             },
             {
                 "name": "reward_from_real_business_verifier",
@@ -1672,8 +1701,10 @@ def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
                 f"`{evidence['attempted']}/{evidence['completed']}/{evidence['incomplete']}`。"
             ),
             (
-                f"- requests 中发现 reference SQL：`{len(request_leaks)}`；所有 raw response、"
-                "trajectory、SQL audit、score 和 token JSONL 均保留在本 run。"
+                f"- 非assistant policy inputs 中发现 reference SQL：`{len(request_leaks)}`；"
+                f"assistant 自生成 SQL 的同值匹配："
+                f"`{len(policy_sql_scan['assistant_generated_matches'])}`；"
+                "所有 raw response、trajectory、SQL audit、score 和 token JSONL 均保留在本 run。"
             ),
             (
                 "- 原始格式失败/业务失败保留 token 与 reward=0；只有基础设施/证据故障"

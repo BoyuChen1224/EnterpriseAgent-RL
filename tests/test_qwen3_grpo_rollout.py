@@ -370,6 +370,42 @@ def test_persistence_failure_stops_and_resume_is_idempotent(tmp_path):
     assert len(read_jsonl(run_dir / "case-results.jsonl")) == 16
 
 
+def test_reference_sql_audit_ignores_model_generated_assistant_history(tmp_path):
+    from scripts.evaluation.run_qwen3_grpo_rollout import _scan_reference_sql_policy_inputs
+
+    request_root = tmp_path / "requests"
+    request_root.mkdir()
+    (request_root / "assistant.json").write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {"role": "system", "content": "public instructions"},
+                    {"role": "assistant", "content": "SELECT private_benchmark"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (request_root / "input.json").write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {"role": "user", "content": "SELECT private_benchmark"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    scan = _scan_reference_sql_policy_inputs(
+        request_root,
+        ["SELECT private_benchmark"],
+        tmp_path,
+    )
+    assert scan["non_assistant_input_matches"] == ["requests/input.json"]
+    assert scan["assistant_generated_matches"] == ["requests/assistant.json"]
+
+
 class _FakeTokenizer:
     chat_template = "{{ messages }}"
     pad_token_id = 0
