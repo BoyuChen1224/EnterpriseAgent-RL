@@ -702,22 +702,23 @@ def _cycle_metrics(trajectories: list[Any]) -> dict[str, Any]:
         seen: set[str] = set()
         sql_attempts += len(sql_steps)
         previous_tool_calls = 0
-        for step in sql_steps:
-            query = str(step.action.arguments.get("query", "")).strip()
-            if query in seen:
-                historical += 1
-            seen.add(query)
+        for step in trajectory.steps:
             current_tool_calls = int(
                 step.tool_result.metadata.get("tool_calls_used", previous_tool_calls)
             )
-            if current_tool_calls > previous_tool_calls:
-                sql_workers += 1
-                if step.tool_result.ok:
-                    sql_ok += 1
+            if step.tool_name == "sql":
+                query = str(step.action.arguments.get("query", "")).strip()
+                if query in seen:
+                    historical += 1
+                seen.add(query)
+                if current_tool_calls > previous_tool_calls:
+                    sql_workers += 1
+                    if step.tool_result.ok:
+                        sql_ok += 1
+                    else:
+                        sql_rejected += 1
                 else:
-                    sql_rejected += 1
-            else:
-                sql_refused += 1
+                    sql_refused += 1
             previous_tool_calls = current_tool_calls
         for previous, current in zip(sql_steps, sql_steps[1:], strict=False):
             previous_query = str(previous.action.arguments.get("query", "")).strip()

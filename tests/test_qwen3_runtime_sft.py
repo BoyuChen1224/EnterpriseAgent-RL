@@ -218,6 +218,35 @@ def test_validation_prepare_separates_public_and_private_verifier(tmp_path: Path
     assert manifest["test_payload_accessed"] is False
 
 
+def test_sql_budget_metrics_use_prior_non_sql_tool_calls():
+    panel = _load_script(
+        "qwen3_runtime_panel_budget", "scripts/evaluation/run_qwen3_runtime_panel.py"
+    )
+
+    def step(tool_name, arguments, *, ok, tool_calls_used):
+        return SimpleNamespace(
+            tool_name=tool_name,
+            action=SimpleNamespace(arguments=arguments),
+            tool_result=SimpleNamespace(
+                ok=ok,
+                metadata={"tool_calls_used": tool_calls_used},
+            ),
+        )
+
+    trajectory = SimpleNamespace(
+        steps=[
+            step("schema", {}, ok=True, tool_calls_used=1),
+            step("dictionary", {"term": "revenue"}, ok=True, tool_calls_used=2),
+            step("sql", {"query": " SELECT 1 "}, ok=False, tool_calls_used=2),
+        ]
+    )
+    metrics = panel._cycle_metrics([trajectory])
+    assert metrics["sql_attempts_denominator"] == 1
+    assert metrics["sql_worker_calls"] == 0
+    assert metrics["sql_rejected"] == 0
+    assert metrics["sql_budget_refused"] == 1
+
+
 def test_engine_event_persistence_is_unique_and_append_only(tmp_path: Path):
     panel = _load_script(
         "qwen3_runtime_panel_events", "scripts/evaluation/run_qwen3_runtime_panel.py"
