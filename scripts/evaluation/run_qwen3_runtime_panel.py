@@ -1002,8 +1002,71 @@ def compare(output: Path) -> dict[str, Any]:
             "comparison": str((output / "comparison.json").resolve()),
         },
     )
+    training_metrics_path = output / "training" / "training-metrics.json"
+    reload_check_path = output / "training" / "reload-check.json"
+    training_metrics = (
+        json.loads(training_metrics_path.read_text()) if training_metrics_path.is_file() else {}
+    )
+    reload_check = json.loads(reload_check_path.read_text()) if reload_check_path.is_file() else {}
+    base_frozen = training_metrics.get(
+        "base_parameters_changed"
+    ) is False and not training_metrics.get("base_gradients_present")
+    report_lines = [
+        "# T-032 / E-029 — Qwen3 Runtime SFT与冻结Base/SFT对照",
+        "",
+        f"- 总状态：`{comparison['status']}`",
+        f"- 代码快照：`{_git_head()}`",
+        "- 主终点：SFT successes − Base successes = "
+        f"`{comparison['primary_endpoint']['sft_successes_minus_base_successes']}`；"
+        "固定分母率差 = "
+        f"`{comparison['primary_endpoint']['sft_success_rate_minus_base_success_rate']}`",
+        "",
+        "## 技术资格",
+        "",
+        "- 训练状态："
+        f"`{training_metrics.get('status', 'NOT_REPORTED')}`；54条、108完成微批、"
+        f"27次有效更新；backward={training_metrics.get('backward_count')}",
+        "- Base冻结："
+        f"`{base_frozen}`；LoRA变化参数="
+        f"{training_metrics.get('lora_changed_parameter_count')}",
+        "- 独立重载："
+        f"`{reload_check.get('status', 'NOT_REPORTED')}`；"
+        f"finite logits=`{reload_check.get('finite_logits')}`；"
+        f"Adapter SHA=`{reload_check.get('adapter_sha256')}`",
+        "",
+        "## 冻结比较",
+        "",
+        "- Base："
+        f"{base['counts']['successes']}/20，scored={base['counts']['scored']}，"
+        f"unknown={base['counts']['unknown']}，状态=`{base['status']}`",
+        "- SFT step27："
+        f"{sft['counts']['successes']}/20，scored={sft['counts']['scored']}，"
+        f"unknown={sft['counts']['unknown']}，状态=`{sft['status']}`",
+        "",
+        "逐任务变化见 [comparison.json](comparison.json) 的 `transitions`，"
+        "两臂完整时主终点才从 null 提升为数值。请求、response、engine event、"
+        "SQL audit、trajectory 与 verifier 结果分别保存在 `evaluation/base/` "
+        "和 `evaluation/sft/`。",
+        "",
+        "## 复现与边界",
+        "",
+        "- train-only 源为固定54条 Runtime decision；validation 仅使用本run冻结的 "
+        "validation-0/1，test 未打开；私有 verifier 输入不进入 policy messages "
+        "或训练进程。",
+        "- checkpoint 规则在评分前固定为 step27；不按验证结果选 checkpoint，"
+        "不扩训、不扫参、不启动 GRPO。",
+        "- 资源与 Job 证据见 [allocation-ledger.json](allocation-ledger.json)、"
+        "[job-chain.json](job-chain.json)；wrapper GPU分钟与 Slurm allocation evidence 分列。",
+    ]
+    (output / "report.md").write_text("\n".join(report_lines) + "\n")
     write_run_manifest(output)
     return comparison
+
+
+def _git_head() -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False
+    ).stdout.strip()
 
 
 def main() -> int:
