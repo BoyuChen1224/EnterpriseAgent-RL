@@ -54,7 +54,7 @@ record_stage() {
     evidence="$run_dir/logs/slurm-${SLURM_JOB_ID}.txt"
     if command -v sacct >/dev/null 2>&1; then
         sacct -X -j "$SLURM_JOB_ID" \
-            --format=JobID,State,ElapsedRaw,Start,End,AllocTRES,AllocCPUS,AllocGRES,NodeList \
+            --format=JobID,State,ElapsedRaw,Start,End,AllocTRES,AllocCPUS,NodeList \
             --parsable2 > "$evidence" 2>&1 || true
     else
         env | sort | grep -E '^(SLURM_|CUDA_VISIBLE_DEVICES=)' > "$evidence" || true
