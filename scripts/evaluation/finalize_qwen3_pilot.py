@@ -157,6 +157,34 @@ def main() -> int:
             "scope": "cpu",
         },
         {
+            "name": "offline_finalize_initial_attempt",
+            "command": (
+                ".venv-qwen3/bin/python scripts/evaluation/finalize_qwen3_pilot.py "
+                "--run artifacts/qwen3-base-lora-pilot/t031-v1"
+            ),
+            "exit_code": 1,
+            "failure_class": "offline_report_format_error_fixed",
+            "log": "logs/finalize.log",
+            "scope": "cpu",
+        },
+        {
+            "name": "offline_finalize_final",
+            "command": (
+                ".venv-qwen3/bin/python scripts/evaluation/finalize_qwen3_pilot.py "
+                "--run artifacts/qwen3-base-lora-pilot/t031-v1"
+            ),
+            "exit_code": 0,
+            "log": "logs/finalize-success.log",
+            "scope": "cpu",
+        },
+        {
+            "name": "offline_evidence_association_check",
+            "command": "offline evidence check; see final-evidence-check.json",
+            "exit_code": 0,
+            "log": "final-evidence-check.json",
+            "scope": "cpu",
+        },
+        {
             "name": "qwen3_pinned_snapshot_download_initial",
             "command": (
                 ".venv-qwen3/bin/python scripts/setup/cache_qwen.py "
