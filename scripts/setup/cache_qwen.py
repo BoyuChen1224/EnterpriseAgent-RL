@@ -1,4 +1,4 @@
-"""Download the immutable safetensors snapshot without importing torch or loading weights."""
+"""Download an immutable safetensors snapshot without loading model weights."""
 
 import argparse
 import hashlib
@@ -37,38 +37,62 @@ def unique_cache_size(root: Path) -> int:
     return total
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--cache", type=Path, default=Path("artifacts/model-cache"))
-parser.add_argument("--config", type=Path, default=Path("configs/model/qwen2.5-1.5b.toml"))
-args = parser.parse_args()
-cfg = ModelSettings.load(args.config)
-path = Path(
-    snapshot_download(
-        cfg.model_id,
-        revision=cfg.revision,
-        cache_dir=args.cache,
-        allow_patterns=["*.json", "*.txt", "*.safetensors", "LICENSE"],
-        resume_download=True,
+def repository_dir(cache: Path, model_id: str) -> Path:
+    return cache / ("models--" + model_id.replace("/", "--"))
+
+
+def build_manifest(cache: Path, config: Path) -> dict:
+    cfg = ModelSettings.load(config)
+    snapshot = Path(
+        snapshot_download(
+            cfg.model_id,
+            revision=cfg.revision,
+            cache_dir=cache,
+            allow_patterns=["*.json", "*.txt", "*.model", "*.safetensors", "LICENSE"],
+            resume_download=True,
+        )
     )
-)
-files = cache_file_manifest(path)
-weight_files = [name for name in files if name.endswith(".safetensors")]
-if not weight_files:
-    raise SystemExit("Incomplete pinned model snapshot")
-manifest = {
-    "schema_version": "2.0",
-    "model": cfg.model_id,
-    "revision": cfg.revision,
-    "snapshot": str(path),
-    "weight_files": weight_files,
-    "files": files,
-    "cache_size_bytes_unique": unique_cache_size(
-        args.cache / "models--Qwen--Qwen2.5-1.5B-Instruct"
-    ),
-    "integrity": "sha256-per-snapshot-file",
-}
-manifest_path = args.cache / "qwen-cache-manifest.json"
-temporary = manifest_path.with_suffix(".tmp")
-temporary.write_text(json.dumps(manifest, indent=2) + "\n")
-temporary.replace(manifest_path)
-print(path)
+    files = cache_file_manifest(snapshot)
+    weight_files = sorted(name for name in files if name.endswith(".safetensors"))
+    if not weight_files:
+        raise SystemExit("Incomplete pinned model snapshot: no safetensors weights")
+    tokenizer_files = sorted(
+        name
+        for name in files
+        if name.startswith(("tokenizer", "special_tokens"))
+        or name in {"chat_template.jinja", "merges.txt", "vocab.json"}
+    )
+    manifest = {
+        "schema_version": "3.0",
+        "model": cfg.model_id,
+        "revision": cfg.revision,
+        "snapshot": str(snapshot),
+        "snapshot_name": snapshot.name,
+        "weight_files": weight_files,
+        "tokenizer_files": tokenizer_files,
+        "files": files,
+        "cache_size_bytes_unique": unique_cache_size(repository_dir(cache, cfg.model_id)),
+        "integrity": "sha256-per-snapshot-file",
+        "trust_remote_code": False,
+        "safetensors_only": True,
+        "enable_thinking": cfg.generation.enable_thinking,
+    }
+    manifest_path = cache / "qwen-cache-manifest.json"
+    temporary = manifest_path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
+    temporary.replace(manifest_path)
+    return manifest
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cache", type=Path, default=Path("artifacts/model-cache-qwen3-8b"))
+    parser.add_argument("--config", type=Path, default=Path("configs/model/qwen3-8b.toml"))
+    args = parser.parse_args()
+    manifest = build_manifest(args.cache, args.config)
+    print(manifest["snapshot"])
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

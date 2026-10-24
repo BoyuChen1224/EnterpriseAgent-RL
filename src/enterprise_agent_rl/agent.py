@@ -225,6 +225,8 @@ class LocalModelPolicy:
                     usage=payload.get("usage") or {},
                     telemetry=payload.get("telemetry") or {},
                 )
+                if attempt["telemetry"].get("event_id"):
+                    attempt["engine_event_id"] = attempt["telemetry"]["event_id"]
             except urllib.error.HTTPError as exc:
                 try:
                     error_payload = json.loads(exc.read(1048576))

@@ -30,12 +30,12 @@ from enterprise_agent_rl.inference_stability import (
     transformers_attention_implementation,
 )
 from enterprise_agent_rl.lora import merge_lora_adapter
-from enterprise_agent_rl.model_protocol import GenerationSettings
+from enterprise_agent_rl.model_protocol import GenerationSettings, render_chat_template
 from enterprise_agent_rl.service_config import ServiceProfile, sha256_file
 
 
 class ModelSettings(Contract):
-    model_id: Literal["Qwen/Qwen2.5-1.5B-Instruct"]
+    model_id: str = Field(min_length=1)
     revision: str = Field(pattern=r"^[a-f0-9]{40}$")
     dtype: Literal["float16"] = "float16"
     attention_backend: AttentionBackend = "sdpa_math"
@@ -305,10 +305,12 @@ class QwenEngine:
         try:
             if request.model != self.cfg.model_id:
                 raise ValueError("model_id_mismatch")
-            text = self.tokenizer.apply_chat_template(
+            text = render_chat_template(
+                self.tokenizer,
                 [m.model_dump() for m in request.messages],
                 tokenize=False,
                 add_generation_prompt=True,
+                enable_thinking=self.cfg.generation.enable_thinking,
             )
             inputs = self.tokenizer(text, return_tensors="pt").to("cuda:0")
             prompt_tokens = inputs.input_ids.shape[-1]

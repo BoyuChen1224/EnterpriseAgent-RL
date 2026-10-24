@@ -1,0 +1,27 @@
+model_config = "configs/model/qwen3-8b.toml"
+dataset = "artifacts/sft-runtime-aligned-decision-pilot/t017-r2-v1/decision/tokenized-dataset.jsonl"
+dataset_sha256 = "a5bbf4f2e0df521a6ad56885f8390b070ef3dee8cd25f0fa858e566b847e64e1"
+max_samples = 8
+max_context_tokens = 1024
+enable_thinking = false
+
+[lora]
+r = 8
+alpha = 16.0
+dropout = 0.0
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+
+[training]
+seed = 42
+microbatch = 1
+gradient_accumulation_steps = 4
+successful_optimizer_updates = 2
+learning_rate = 0.0001
+betas = [0.9, 0.999]
+eps = 0.00000001
+weight_decay = 0.0
+foreach = false
+fused = false
+clip_norm = 1.0
+amp_initial_scale = 1024.0
+checkpoint_use_reentrant = true

@@ -18,6 +18,40 @@ class GenerationSettings(Contract):
     format_retries: int = Field(default=1, ge=0, le=2)
     parse_mode: Literal["strict", "json_fence"] = "json_fence"
     seed: int = Field(default=17, ge=0)
+    # None preserves the historical Qwen2.5 template behavior.  Qwen3
+    # configs set this explicitly to False so thinking cannot leak into the
+    # business Action protocol.
+    enable_thinking: bool | None = None
+
+
+def render_chat_template(
+    tokenizer,
+    messages: list[dict[str, str]],
+    *,
+    tokenize: bool,
+    add_generation_prompt: bool,
+    enable_thinking: bool | None = None,
+):
+    """Render one chat through the tokenizer's own template.
+
+    The old Qwen2.5 path deliberately omits ``enable_thinking``.  When a
+    newer model opts into a hard switch, a tokenizer that cannot accept the
+    switch fails closed instead of silently falling back to a prompt suffix
+    such as ``/no_think``.
+    """
+
+    kwargs = {
+        "tokenize": tokenize,
+        "add_generation_prompt": add_generation_prompt,
+    }
+    if enable_thinking is not None:
+        kwargs["enable_thinking"] = enable_thinking
+    try:
+        return tokenizer.apply_chat_template(messages, **kwargs)
+    except TypeError as exc:
+        if enable_thinking is not None:
+            raise RuntimeError("chat_template_enable_thinking_unsupported") from exc
+        raise
 
 
 class ModelFailure(RuntimeError):

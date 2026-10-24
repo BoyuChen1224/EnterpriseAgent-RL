@@ -27,6 +27,8 @@ slurm-*.out
 logs/
 
 .venv-gpu/
+.venv-qwen3/
+.venv-qwen3-t031/
 .cache/
 *.sif
 

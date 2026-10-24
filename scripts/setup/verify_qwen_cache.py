@@ -33,16 +33,18 @@ def unique_size(root: Path) -> int:
     return total
 
 
+def repository_dir(cache: Path, model_id: str) -> Path:
+    return cache / ("models--" + model_id.replace("/", "--"))
+
+
 def verify(cache: Path, config: Path) -> dict:
     cfg = ModelSettings.load(config)
-    repo = cache / "models--Qwen--Qwen2.5-1.5B-Instruct"
+    repo = repository_dir(cache, cfg.model_id)
     snapshot = repo / "snapshots" / cfg.revision
     required = {
         "config.json",
         "tokenizer_config.json",
         "tokenizer.json",
-        "merges.txt",
-        "vocab.json",
     }
     missing = sorted(name for name in required if not (snapshot / name).is_file())
     weight_files = sorted(path.name for path in snapshot.glob("*.safetensors") if path.is_file())
@@ -68,6 +70,12 @@ def verify(cache: Path, config: Path) -> dict:
             for name, record in file_records.items()
         )
     )
+    tokenizer_config = {}
+    if (snapshot / "tokenizer_config.json").is_file():
+        try:
+            tokenizer_config = json.loads((snapshot / "tokenizer_config.json").read_text())
+        except json.JSONDecodeError:
+            tokenizer_config = {}
     complete = (
         snapshot.is_dir()
         and not missing
@@ -75,6 +83,7 @@ def verify(cache: Path, config: Path) -> dict:
         and not incomplete_blobs
         and bool(file_records)
         and manifest_matches
+        and bool(tokenizer_config.get("chat_template"))
     )
     return {
         "schema_version": "1.0",
@@ -91,6 +100,9 @@ def verify(cache: Path, config: Path) -> dict:
         "files": file_records,
         "manifest_path": str(manifest_path),
         "manifest_matches": manifest_matches,
+        "chat_template_present": bool(tokenizer_config.get("chat_template")),
+        "trust_remote_code": False,
+        "safetensors_only": True,
         "cache_size_bytes_unique": unique_size(repo) if repo.is_dir() else 0,
         "integrity": "sha256-per-snapshot-file",
     }
@@ -98,12 +110,12 @@ def verify(cache: Path, config: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cache", type=Path, default=Path("artifacts/model-cache"))
-    parser.add_argument("--config", type=Path, default=Path("configs/model/qwen2.5-1.5b.toml"))
+    parser.add_argument("--cache", type=Path, default=Path("artifacts/model-cache-qwen3-8b"))
+    parser.add_argument("--config", type=Path, default=Path("configs/model/qwen3-8b.toml"))
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("experiments/m2b-preparation/qwen-cache-verification.json"),
+        default=Path("artifacts/qwen3-base-lora-pilot/t031-v1/cache-verification.json"),
     )
     args = parser.parse_args()
     report = verify(args.cache, args.config)

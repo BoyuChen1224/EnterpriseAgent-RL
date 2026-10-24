@@ -1,0 +1,15 @@
+seed = 17
+max_actions = 20
+max_tool_calls = 14
+episode_timeout_s = 600
+inference_timeout_s = 120
+sql_timeout_s = 2
+sql_max_rows = 100
+sql_max_bytes = 65536
+sql_memory_mb = 256
+step_penalty = 0.0
+repeat_penalty = 0.0
+error_penalty = 0.0
+recovery_bonus = 0.0
+token_price_per_million = 0.0
+tool_price = 0.0

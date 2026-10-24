@@ -24,7 +24,12 @@ from enterprise_agent_rl.inference_stability import (
     attention_backend_context,
     transformers_attention_implementation,
 )
-from enterprise_agent_rl.model_protocol import GenerationSettings, ModelFailure, parse_action
+from enterprise_agent_rl.model_protocol import (
+    GenerationSettings,
+    ModelFailure,
+    parse_action,
+    render_chat_template,
+)
 from enterprise_agent_rl.trajectories import Trajectory
 
 from .budget import BudgetError, BudgetGuard
@@ -775,7 +780,14 @@ class HfRolloutEngine:
         )
         supported = {
             key: values[key]
-            for key in ("temperature", "top_p", "max_tokens", "format_retries", "parse_mode")
+            for key in (
+                "temperature",
+                "top_p",
+                "max_tokens",
+                "format_retries",
+                "parse_mode",
+                "enable_thinking",
+            )
             if key in values
         }
         supported["seed"] = seed
@@ -926,8 +938,12 @@ class HfRolloutEngine:
         model_execution_started = False
         started = time.monotonic()
         try:
-            text = self.policy.tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
+            text = render_chat_template(
+                self.policy.tokenizer,
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=generation.enable_thinking,
             )
             inputs = self.policy.tokenizer(text, return_tensors="pt")
             inputs = {

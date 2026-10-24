@@ -15,7 +15,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Protocol
 
-from enterprise_agent_rl.model_protocol import parse_action
+from enterprise_agent_rl.common import Action
+from enterprise_agent_rl.model_protocol import parse_action, render_chat_template
 
 
 class ChatTokenizer(Protocol):
@@ -150,12 +151,15 @@ def _chat_ids(
     messages: list[dict[str, str]],
     *,
     add_generation_prompt: bool,
+    enable_thinking: bool | None = None,
 ) -> list[int]:
     return _token_list(
-        tokenizer.apply_chat_template(
+        render_chat_template(
+            tokenizer,
             messages,
             tokenize=True,
             add_generation_prompt=add_generation_prompt,
+            enable_thinking=enable_thinking,
         )
     )
 
@@ -165,6 +169,7 @@ def format_sft_example(
     example: dict[str, Any],
     *,
     max_length: int | None = None,
+    enable_thinking: bool | None = None,
 ) -> dict[str, Any]:
     """Render one example and return labels with exact assistant-only spans.
 
@@ -176,7 +181,12 @@ def format_sft_example(
 
     messages = example["messages"]
     indices = example["assistant_message_indices"]
-    full_ids = _chat_ids(tokenizer, messages, add_generation_prompt=False)
+    full_ids = _chat_ids(
+        tokenizer,
+        messages,
+        add_generation_prompt=False,
+        enable_thinking=enable_thinking,
+    )
     if not full_ids:
         raise SFTDataError(f"empty_rendered_example:{example.get('example_id')}")
 
@@ -187,11 +197,13 @@ def format_sft_example(
             tokenizer,
             messages[:index],
             add_generation_prompt=True,
+            enable_thinking=enable_thinking,
         )
         end_ids = _chat_ids(
             tokenizer,
             messages[: index + 1],
             add_generation_prompt=False,
+            enable_thinking=enable_thinking,
         )
         if full_ids[: len(prefix_ids)] != prefix_ids:
             raise SFTDataError(f"assistant_prefix_alignment_failed:{example.get('example_id')}")
@@ -231,11 +243,18 @@ def audit_tokenized_dataset(
     rows: list[dict[str, Any]],
     *,
     max_context_tokens: int,
+    enable_thinking: bool | None = None,
 ) -> dict[str, Any]:
     """Tokenize every complete trajectory without truncation and summarize it."""
 
     formatted = [
-        format_sft_example(tokenizer, row, max_length=max_context_tokens) for row in rows
+        format_sft_example(
+            tokenizer,
+            row,
+            max_length=max_context_tokens,
+            enable_thinking=enable_thinking,
+        )
+        for row in rows
     ]
     lengths = [item["full_sequence_tokens"] for item in formatted]
     supervised = [item["supervised_assistant_tokens"] for item in formatted]
@@ -287,6 +306,137 @@ def audit_tokenized_dataset(
             for item in formatted
         ],
     }
+
+
+def load_decision_rows(dataset_path: Path, *, expected_sha256: str) -> list[dict[str, Any]]:
+    """Load the frozen train-only decision rows without using old token IDs.
+
+    The source file contains historical Qwen2.5 tokenization beside the
+    public context and current teacher Action.  This loader intentionally
+    consumes only the latter two fields and fails closed on future results or
+    verifier-only answers.
+    """
+
+    actual_sha256 = sha256_file(dataset_path)
+    if actual_sha256 != expected_sha256:
+        raise SFTDataError(f"decision_dataset_sha256_mismatch:{actual_sha256}")
+    rows: list[dict[str, Any]] = []
+    with dataset_path.open() as stream:
+        for line_number, line in enumerate(stream, start=1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise SFTDataError(f"invalid_decision_jsonl:{line_number}") from exc
+            if not isinstance(row, dict):
+                raise SFTDataError(f"decision_row_not_object:{line_number}")
+            task_id = row.get("task_id")
+            if not isinstance(task_id, str) or not task_id.startswith("train-"):
+                raise SFTDataError("decision_row_not_train")
+            context = row.get("context_messages")
+            if not isinstance(context, list) or not context:
+                raise SFTDataError("decision_context_missing")
+            if any(
+                not isinstance(message, dict)
+                or message.get("role") not in {"system", "user", "assistant"}
+                or not isinstance(message.get("content"), str)
+                for message in context
+            ):
+                raise SFTDataError("decision_context_invalid")
+            if context[-1].get("role") != "user":
+                raise SFTDataError("decision_context_must_end_with_user")
+            if _contains_key(row, "reference_sql") or _contains_key(row, "expected_result"):
+                raise SFTDataError("decision_verifier_data_leakage")
+            if row.get("future_result_absent") is not True:
+                raise SFTDataError("decision_future_result_not_absent")
+            try:
+                action = Action.model_validate(row.get("target_action"))
+            except Exception as exc:
+                raise SFTDataError("decision_target_action_invalid") from exc
+            target_content = json.dumps(
+                action.model_dump(), ensure_ascii=False, separators=(",", ":")
+            )
+            if not target_content.strip():
+                raise SFTDataError("decision_target_content_empty")
+            rows.append(
+                {
+                    "example_id": row.get("example_id"),
+                    "task_id": task_id,
+                    "step_index": row.get("step_index"),
+                    "context_messages": context,
+                    "target_action": action.model_dump(),
+                    "target_content": target_content,
+                    "source_policy_kind": row.get("source_policy_kind"),
+                    "teacher_trajectory_sha256": row.get("teacher_trajectory_sha256"),
+                    "source_row_sha256": hashlib.sha256(line.strip().encode()).hexdigest(),
+                }
+            )
+    if len(rows) != 54:
+        raise SFTDataError(f"decision_row_count:{len(rows)}")
+    return rows
+
+
+def decision_example(row: dict[str, Any]) -> dict[str, Any]:
+    """Rebuild one assistant-only example from public context and Action."""
+
+    messages = list(row["context_messages"]) + [
+        {"role": "assistant", "content": row["target_content"]}
+    ]
+    return {
+        "example_id": row["example_id"],
+        "task_id": row["task_id"],
+        "step_index": row["step_index"],
+        "messages": messages,
+        "assistant_message_indices": [len(messages) - 1],
+        "assistant_only_loss": True,
+        "source_policy_kind": row.get("source_policy_kind"),
+        "teacher_trajectory_sha256": row.get("teacher_trajectory_sha256"),
+        "source_row_sha256": row.get("source_row_sha256"),
+        "target_action": row["target_action"],
+    }
+
+
+def select_decision_examples(
+    tokenizer: ChatTokenizer,
+    rows: list[dict[str, Any]],
+    *,
+    max_samples: int,
+    max_context_tokens: int,
+    enable_thinking: bool,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Sort, re-render, and select the first bounded Qwen3 examples."""
+
+    if max_samples <= 0:
+        raise SFTDataError("decision_max_samples_invalid")
+    ordered = sorted(
+        rows,
+        key=lambda row: (str(row["task_id"]), int(row["step_index"]), str(row["example_id"])),
+    )
+    selected: list[dict[str, Any]] = []
+    formatted: list[dict[str, Any]] = []
+    for row in ordered:
+        example = decision_example(row)
+        try:
+            item = format_sft_example(
+                tokenizer,
+                example,
+                max_length=max_context_tokens,
+                enable_thinking=enable_thinking,
+            )
+        except SFTDataError as exc:
+            if str(exc).startswith("sequence_exceeds_context_without_truncation"):
+                continue
+            raise
+        selected.append(example)
+        formatted.append(item)
+        if len(selected) == max_samples:
+            break
+    if len(selected) != max_samples:
+        raise SFTDataError(
+            f"decision_bounded_examples_insufficient:{len(selected)}:{max_samples}"
+        )
+    return selected, formatted
 
 
 def yaml_scalar(value: Any) -> str:
