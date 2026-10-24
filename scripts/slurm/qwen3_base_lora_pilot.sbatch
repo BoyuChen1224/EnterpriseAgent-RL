@@ -86,7 +86,7 @@ if [[ "$stage" == "base" ]]; then
     for attempt in $(seq 1 360); do
         ready=0
         for index in 0 1; do
-            if curl -fsS "http://127.0.0.1:${ports[$index]}/health" >/dev/null 2>&1; then
+            if curl --noproxy '*' -fsS "http://127.0.0.1:${ports[$index]}/health" >/dev/null 2>&1; then
                 ready=$((ready + 1))
             fi
         done
