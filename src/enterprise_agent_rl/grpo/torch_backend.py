@@ -121,10 +121,12 @@ class QwenPolicy:
         self.mode = mode
         self.evaluation_arm = evaluation_arm
         self.adapter = LocalGRPOAdapter(
-            epsilon=float(config.optimizer["epsilon"]), beta=float(config.optimizer["beta"])
+            epsilon=float(config.optimizer.get("epsilon", 0.2)),
+            beta=float(config.optimizer.get("beta", 0.0)),
         )
         self.model_ref_id = f"{config.model['model_id']}@{config.model['revision']}"
         self.closed = False
+        self.persistence_failed = False
         self.amp_skip_replays_total = 0
         self.forward_backward_count = 0
 
@@ -259,9 +261,10 @@ class QwenPolicy:
             raise RuntimeError("real_grpo_requires_one_visible_cuda_device")
         device_info = _require_v100_device(torch)
         _record_gpu_device(context, device_info, mode="evaluation", arm=arm)
-        if os.environ.get("PYTHONHASHSEED") != "42" or os.environ.get(
-            "CUBLAS_WORKSPACE_CONFIG"
-        ) != ":4096:8":
+        if (
+            os.environ.get("PYTHONHASHSEED") != "42"
+            or os.environ.get("CUBLAS_WORKSPACE_CONFIG") != ":4096:8"
+        ):
             raise RuntimeError("determinism_environment_mismatch")
         torch.use_deterministic_algorithms(True, warn_only=False)
         torch.backends.cuda.matmul.allow_tf32 = False
@@ -302,14 +305,12 @@ class QwenPolicy:
             raise RuntimeError("tokenizer_chat_template_missing")
         raw_template_sha = sha256_bytes(template.encode("utf-8"))
         canonical_template_sha = sha256_bytes(
-            json.dumps(
-                template, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-            ).encode("utf-8")
+            json.dumps(template, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+                "utf-8"
+            )
         )
         expected_raw = str(config.evaluation.get("tokenizer_raw_template_sha256", ""))
-        expected_canonical = str(
-            config.evaluation.get("tokenizer_canonical_json_sha256", "")
-        )
+        expected_canonical = str(config.evaluation.get("tokenizer_canonical_json_sha256", ""))
         if expected_raw and raw_template_sha != expected_raw:
             raise RuntimeError("tokenizer_chat_template_raw_hash_mismatch")
         if expected_canonical and canonical_template_sha != expected_canonical:
@@ -371,16 +372,18 @@ class QwenPolicy:
             delta_weight = delta / "adapter_model.safetensors"
             delta_config = delta / "adapter_config.json"
             expected_delta = str(config.evaluation.get("rl_delta_sha256", ""))
-            expected_delta_config = str(
-                config.evaluation.get("rl_delta_config_sha256", "")
-            )
-            if not delta_weight.is_file() or not expected_delta or sha256_file(
-                delta_weight
-            ) != expected_delta:
+            expected_delta_config = str(config.evaluation.get("rl_delta_config_sha256", ""))
+            if (
+                not delta_weight.is_file()
+                or not expected_delta
+                or sha256_file(delta_weight) != expected_delta
+            ):
                 raise RuntimeError("fixed_rl_delta_adapter_hash_mismatch")
-            if not delta_config.is_file() or not expected_delta_config or sha256_file(
-                delta_config
-            ) != expected_delta_config:
+            if (
+                not delta_config.is_file()
+                or not expected_delta_config
+                or sha256_file(delta_config) != expected_delta_config
+            ):
                 raise RuntimeError("fixed_rl_delta_adapter_config_hash_mismatch")
             guard.check("evaluation:RL:delta-assets-verified")
             delta_merge = merge_lora_adapter(
@@ -556,8 +559,7 @@ class QwenPolicy:
             scale_after = float(self.scaler.get_scale())
             if not changed:
                 if (
-                    math.isfinite(grad_norm) is False
-                    and scale_after >= scale_before
+                    math.isfinite(grad_norm) is False and scale_after >= scale_before
                 ) or scale_after >= scale_before:
                     raise FloatingPointError("nonfinite_gradient_or_amp_skip_without_backoff")
                 if self.amp_skip_replays_total >= int(
@@ -768,6 +770,7 @@ class HfRolloutEngine:
         self.stage = "evaluation" if evaluation else "training"
         self.arm = str(getattr(policy, "evaluation_arm", None) or "train")
         self.evidence = EvidenceStore(run_dir, stage=self.stage, arm=self.arm)
+        self.persistence_failed = False
 
     def _settings(self) -> Settings:
         return Settings.model_validate(self.config.runtime)
@@ -871,6 +874,8 @@ class HfRolloutEngine:
         request_index: int,
     ) -> GenerationResult:
         torch = _torch()
+        if self.persistence_failed:
+            raise EvidencePersistenceError("model_evidence_persistence_halted")
         self.request_counter += 1
         logical_request_index = self.request_counter
         self.policy.guard.record_call("model_requests")
@@ -897,9 +902,7 @@ class HfRolloutEngine:
             # neutral values explicitly prevents the model's generation
             # config (for example temperature=.7/top_p=.8/top_k=20) from
             # leaking into the effective HF kwargs or its warnings.
-            generation_parameters.update(
-                {"temperature": 1.0, "top_p": 1.0, "top_k": 0}
-            )
+            generation_parameters.update({"temperature": 1.0, "top_p": 1.0, "top_k": 0})
         else:
             generation_parameters.update(
                 {
@@ -926,14 +929,18 @@ class HfRolloutEngine:
         # The intent is durable before tokenization/model execution.  A fresh
         # engine can therefore restart its local request counter at 1 without
         # ever reusing the prior request/response/event paths.
-        handle = self.evidence.start_attempt(
-            episode_id=episode_id,
-            task_id=task.task_id,
-            sample_index=sample_index,
-            messages=messages,
-            generation_settings=generation_parameters,
-            model_identity=model_identity,
-        )
+        try:
+            handle = self.evidence.start_attempt(
+                episode_id=episode_id,
+                task_id=task.task_id,
+                sample_index=sample_index,
+                messages=messages,
+                generation_settings=generation_parameters,
+                model_identity=model_identity,
+            )
+        except EvidencePersistenceError:
+            self.persistence_failed = True
+            raise
         prompt_ids: list[int] = []
         model_execution_started = False
         started = time.monotonic()
@@ -1005,6 +1012,8 @@ class HfRolloutEngine:
             if len(raw_logits) != len(scores):
                 raise RuntimeError("raw_behavior_step_count_mismatch")
             generated_ids = full_ids[len(prompt_ids) : len(prompt_ids) + len(raw_logits)]
+            if len(generated_ids) != len(raw_logits):
+                raise RuntimeError("generated_token_step_count_mismatch")
             raw_log_probs: list[float] = []
             behavior_log_probs: list[float] = []
             for index, token_id in enumerate(generated_ids):
@@ -1040,6 +1049,17 @@ class HfRolloutEngine:
                     "physical_request_index": handle.attempt_index,
                     "elapsed_s": time.monotonic() - started,
                     "generation_settings": hf_generation,
+                    "episode_seed": int(seed),
+                    "sampling_seed": int(seed + request_index),
+                    "eos_token_id": self.policy.tokenizer.eos_token_id,
+                    "eos_generated": bool(
+                        generated_ids
+                        and self.policy.tokenizer.eos_token_id is not None
+                        and generated_ids[-1] == self.policy.tokenizer.eos_token_id
+                    ),
+                    "native_score_log_probs": list(behavior_log_probs),
+                    "native_raw_log_probs": list(raw_log_probs),
+                    "native_score_count": len(behavior_log_probs),
                 },
             )
             record.validate()
@@ -1070,6 +1090,7 @@ class HfRolloutEngine:
         except EvidencePersistenceError:
             # A missing response/event/journal is a technical evidence stop;
             # never turn it into an ordinary model-error response.
+            self.persistence_failed = True
             raise
         except Exception as exc:
             record = self._error_record(
@@ -1129,7 +1150,14 @@ class HfRolloutEngine:
             action_text="",
             action_status="model_error",
             error={"type": "generation_error", "message": message[:1000]},
-            metadata={"physical_request_index": handle.attempt_index},
+            metadata={
+                "physical_request_index": handle.attempt_index,
+                "eos_token_id": self.policy.tokenizer.eos_token_id,
+                "eos_generated": False,
+                "native_score_log_probs": [],
+                "native_raw_log_probs": [],
+                "native_score_count": 0,
+            },
         )
 
 
@@ -1183,7 +1211,7 @@ class _DirectPolicy:
                 task=self.task,
                 episode_id=self.episode_id,
                 sample_index=self.sample_index,
-                seed=self.seed + retry,
+                seed=self.seed,
                 policy_snapshot=self.snapshot,
                 request_index=len(self.records),
             )
@@ -1272,20 +1300,18 @@ class RealVerifierWorker:
         sql_actions = [step for step in trajectory.steps if step.tool_name == "sql"]
         sql_ok = sum(bool(step.tool_result.ok) for step in sql_actions)
         non_sql_actions = [
-            step
-            for step in trajectory.steps
-            if step.tool_name in {"schema", "dictionary", "check"}
+            step for step in trajectory.steps if step.tool_name in {"schema", "dictionary", "check"}
         ]
+
         def budget_errors(step):
             return "budget" in str(step.tool_result.error or "").lower()
+
         runtime_worker_sql = sum(not budget_errors(step) for step in sql_actions)
         runtime_worker_non_sql = sum(not budget_errors(step) for step in non_sql_actions)
         worker_count = runtime_worker_sql + runtime_worker_non_sql
         if self.guard is not None:
             self.guard.record_call("accepted_actions", len(trajectory.steps))
-            self.guard.record_call(
-                "tool_actions", len(sql_actions) + len(non_sql_actions)
-            )
+            self.guard.record_call("tool_actions", len(sql_actions) + len(non_sql_actions))
             self.guard.record_call("runtime_workers", worker_count)
         budget_rejections = 0
         error_values: list[Any] = []

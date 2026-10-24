@@ -94,6 +94,7 @@ class TokenRecord:
             "raw_policy_log_probs": self.raw_policy_log_probs,
             "old_per_token_logps": self.raw_policy_log_probs,
             "behavior_sampling_log_probs": self.behavior_sampling_log_probs,
+            "completion_mask": [1] * len(self.generated_token_ids),
             "generated_token_count": len(self.generated_token_ids),
             "action_text": self.action_text,
             "action_status": self.action_status,

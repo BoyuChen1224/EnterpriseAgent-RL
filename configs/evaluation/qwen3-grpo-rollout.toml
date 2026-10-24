@@ -1,0 +1,86 @@
+# T-033/E-030.  Rollout-only contract; this is not a training configuration.
+
+[model]
+model_id = "Qwen/Qwen3-8B"
+revision = "b968826d9c46dd6066d109eabc6255188de91218"
+dtype = "float16"
+attention_backend = "sdpa_math"
+max_context_tokens = 4096
+enable_thinking = false
+cache_dir = "artifacts/model-cache-qwen3-8b"
+parent_adapter = "artifacts/qwen3-runtime-sft-comparison/t032-v1/training/final-adapter"
+parent_adapter_sha256 = "413d1b0211ba93b2df322dcdaeb1fa1c3f019210c8ded510a2920e5ad6e114e9"
+parent_adapter_config_sha256 = "560d44e512b9745703519005087804dbcf6b819e2b6e1694d33571f9e346ed37"
+
+[lora]
+rank = 8
+alpha = 16.0
+dropout = 0.0
+module_count = 252
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+
+[rollout]
+rounds = 1
+group_count = 4
+samples_per_task = 4
+seed_start = 74
+seed_end = 89
+
+[rollout.generation]
+temperature = 1.0
+top_p = 1.0
+top_k = 0
+max_tokens = 512
+format_retries = 1
+parse_mode = "json_fence"
+enable_thinking = false
+sampling_seed_rule = "episode_seed + physical_request_index_zero_based"
+
+[runtime]
+seed = 17
+max_actions = 20
+max_tool_calls = 14
+episode_timeout_s = 600
+inference_timeout_s = 120
+sql_timeout_s = 2
+sql_max_rows = 100
+sql_max_bytes = 65536
+sql_memory_mb = 256
+step_penalty = 0.0
+repeat_penalty = 0.0
+error_penalty = 0.0
+recovery_bonus = 0.0
+token_price_per_million = 0.0
+tool_price = 0.0
+
+[budget]
+run_hard_seconds = 5400
+job_hard_seconds = 3600
+soft_seconds = 3480
+cleanup_reserve_seconds = 120
+gpu_count = 1
+
+[limits]
+model_requests = 640
+tool_actions = 240
+runtime_workers = 240
+verifier_calls = 24
+verifier_sql = 48
+accepted_actions = 320
+
+[slurm]
+account = "pi_daipeishan"
+qos = "gpuq"
+partitions = ["gpu2Q", "gpu4Q", "gpu4RQ", "gpu8Q"]
+gpus = 1
+cpus_per_task = 4
+memory = "64G"
+time_minutes = 60
+cleanup_reserve_seconds = 120
+gpu_budget_minutes = 90
+
+[data]
+split = "train"
+year = 2021
+task_order = ["train-0-schema", "train-0-region", "train-1-product", "train-1-recovery"]
+source_panel_manifest = "artifacts/qwen3-base-lora-pilot/t031-v1/panel-manifest.json"
