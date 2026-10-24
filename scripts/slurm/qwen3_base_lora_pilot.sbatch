@@ -23,6 +23,7 @@ run_dir="${EARL_QWEN3_RUN:-$PWD/artifacts/qwen3-base-lora-pilot/t031-v1}"
 cache_dir="${EARL_MODEL_CACHE:-$PWD/artifacts/model-cache-qwen3-8b}"
 python_bin="${EARL_QWEN3_PYTHON:-$PWD/.venv-qwen3/bin/python}"
 stage="${PILOT_STAGE:-base}"
+lora_mode="${PILOT_LORA_MODE:-train}"
 mkdir -p "$run_dir/logs"
 stage_started="$(date +%s.%N)"
 gpu_count=1
@@ -33,10 +34,14 @@ record_stage() {
     local status="$1"
     local code="$2"
     local ended elapsed
+    local ledger_stage="$stage"
+    if [[ "$stage" == "lora" ]]; then
+        ledger_stage="lora-${lora_mode}"
+    fi
     ended="$(date +%s.%N)"
     elapsed="$(awk -v a="$stage_started" -v b="$ended" 'BEGIN {print b-a}')"
     "$python_bin" scripts/evaluation/record_qwen3_allocation.py \
-        --run "$run_dir" --stage "$stage" --status "$status" --exit-code "$code" \
+        --run "$run_dir" --stage "$ledger_stage" --status "$status" --exit-code "$code" \
         --elapsed-s "$elapsed" --gpu-count "$gpu_count" || true
 }
 finish() {
@@ -128,11 +133,23 @@ if [[ "$stage" == "lora" ]]; then
         echo "base panel is not sealed" >&2
         exit 2
     fi
-    "$python_bin" scripts/training/run_qwen3_lora_smoke.py \
-        --cache "$cache_dir" --output "$run_dir/lora" \
-        --model-config configs/model/qwen3-8b.toml \
-        --training-config configs/training/qwen3-lora-smoke.toml \
-        > "$run_dir/logs/lora.log" 2>&1
+    lora_args=(
+        --cache "$cache_dir" --output "$run_dir/lora"
+        --model-config configs/model/qwen3-8b.toml
+        --training-config configs/training/qwen3-lora-smoke.toml
+    )
+    if [[ "$lora_mode" == "reload-only" ]]; then
+        lora_args+=(
+            --reload-only
+            --prior-reload-failure
+            "CUDA OOM after training model references were not released"
+        )
+    elif [[ "$lora_mode" != "train" ]]; then
+        echo "unknown PILOT_LORA_MODE=$lora_mode" >&2
+        exit 2
+    fi
+    "$python_bin" scripts/training/run_qwen3_lora_smoke.py "${lora_args[@]}" \
+        > "$run_dir/logs/lora-${lora_mode}.log" 2>&1
     exit 0
 fi
 

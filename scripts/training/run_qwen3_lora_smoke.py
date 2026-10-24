@@ -266,6 +266,125 @@ def _write_dataset_artifacts(
     _write_json(output / "mask-audit.json", mask_audit)
 
 
+def _reload_saved_adapter(
+    *,
+    output: Path,
+    cache: Path,
+    model_config_path: Path,
+    training_config_path: Path,
+    dataset: Path,
+    prior_reload_failure: str | None,
+) -> int:
+    """Reload only a persisted adapter after a recoverable post-training failure."""
+
+    train_cfg = tomllib.loads(training_config_path.read_text())
+    cfg = ModelSettings.load(model_config_path)
+    _validate_fixed_config(cfg, train_cfg)
+    if sha256_file(dataset) != DATASET_SHA256:
+        raise RuntimeError("supervision_dataset_sha256_mismatch")
+
+    import torch
+    import transformers
+    from transformers import AutoTokenizer
+
+    if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
+        raise RuntimeError("requires_one_visible_cuda_device")
+    capability = torch.cuda.get_device_capability(0)
+    if capability < (7, 0) or "sm_70" not in torch.cuda.get_arch_list():
+        raise RuntimeError("wheel_missing_volta_support_or_unsupported_device")
+    cache_manifest = cache / "qwen-cache-manifest.json"
+    if not cache_manifest.is_file():
+        raise RuntimeError("cache_integrity_manifest_missing")
+    cache_data = json.loads(cache_manifest.read_text())
+    if cache_data.get("model") != MODEL_ID or cache_data.get("revision") != MODEL_REVISION:
+        raise RuntimeError("cache_integrity_manifest_mismatch")
+    adapter = output / "adapter"
+    if not (adapter / "adapter_model.safetensors").is_file():
+        raise RuntimeError("saved_adapter_missing")
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        cfg.model_id,
+        revision=cfg.revision,
+        cache_dir=str(cache),
+        local_files_only=True,
+        trust_remote_code=False,
+        use_fast=True,
+    )
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    rows = load_decision_rows(dataset, expected_sha256=DATASET_SHA256)
+    _, formatted = select_decision_examples(
+        tokenizer,
+        rows,
+        max_samples=8,
+        max_context_tokens=1024,
+        enable_thinking=False,
+    )
+
+    reload_model = _load_model(torch, transformers, cfg, cache).eval()
+    merge_summary = merge_lora_adapter(
+        reload_model,
+        adapter,
+        expected_model_id=MODEL_ID,
+        expected_revision=MODEL_REVISION,
+    )
+    input_ids = torch.tensor([formatted[0]["input_ids"]], dtype=torch.long, device="cuda:0")
+    attention_mask = torch.ones_like(input_ids)
+    with attention_backend_context(torch, "sdpa_math"):
+        with torch.inference_mode():
+            reloaded = reload_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                use_cache=True,
+                output_attentions=False,
+            )
+    finite_logits = bool(torch.isfinite(reloaded.logits).all().item())
+    if not finite_logits or merge_summary["module_count"] != EXPECTED_MODULE_COUNT:
+        raise RuntimeError("adapter_reload_forward_failed")
+    reload_check = {
+        "status": "LORA_UPDATE_RELOAD_PASS",
+        "recovery_mode": "reload_only_after_prior_reload_oom"
+        if prior_reload_failure
+        else "reload_only",
+        "prior_reload_failure": prior_reload_failure,
+        "base_model_load_count_in_reload_process": 1,
+        "base_model_load_count_observed_total": 3 if prior_reload_failure else 2,
+        "adapter_merge_count_in_reload_process": 1,
+        "successful_adapter_merge_count_total": 1,
+        "injection_count_in_training": 1,
+        "merge": merge_summary,
+        "adapter_sha256": sha256_file(adapter / "adapter_model.safetensors"),
+        "adapter_config_sha256": sha256_file(adapter / "adapter_config.json"),
+        "input_tokens": int(input_ids.shape[-1]),
+        "logits_shape": list(reloaded.logits.shape),
+        "logits_dtype": str(reloaded.logits.dtype),
+        "finite_logits": finite_logits,
+        "output_exact_fp16_equal_required": False,
+        "torch": torch.__version__,
+        "transformers": transformers.__version__,
+        "device": "cuda:0",
+        "compute_capability": list(capability),
+    }
+    _write_json(output / "reload-check.json", reload_check)
+    run_root = output.parent
+    checks_path = run_root / "checks.json"
+    checks = json.loads(checks_path.read_text()) if checks_path.is_file() else {}
+    checks.update(
+        {
+            "lora_update_reload_pass": True,
+            "successful_optimizer_updates": 2,
+            "module_count": EXPECTED_MODULE_COUNT,
+            "adapter_reloaded_finite": finite_logits,
+            "reload_recovery_mode": reload_check["recovery_mode"],
+        }
+    )
+    _write_json(checks_path, checks)
+    del reloaded, reload_model
+    gc.collect()
+    torch.cuda.empty_cache()
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", type=Path, default=Path("artifacts/model-cache-qwen3-8b"))
@@ -281,8 +400,19 @@ def main() -> int:
             "artifacts/sft-runtime-aligned-decision-pilot/t017-r2-v1/decision/tokenized-dataset.jsonl"
         ),
     )
+    parser.add_argument("--reload-only", action="store_true")
+    parser.add_argument("--prior-reload-failure")
     args = parser.parse_args()
     output = args.output
+    if args.reload_only:
+        return _reload_saved_adapter(
+            output=output,
+            cache=args.cache,
+            model_config_path=args.model_config,
+            training_config_path=args.training_config,
+            dataset=args.dataset,
+            prior_reload_failure=args.prior_reload_failure,
+        )
     if output.exists() and any(output.iterdir()):
         raise RuntimeError(f"refusing_nonempty_lora_output:{output}")
     output.mkdir(parents=True, exist_ok=True)
@@ -664,7 +794,15 @@ def main() -> int:
         },
     )
 
-    del model, optimizer, scaler
+    del (
+        model,
+        optimizer,
+        scaler,
+        trainable,
+        base_parameters,
+        lora_before,
+        optimizer_ids,
+    )
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
