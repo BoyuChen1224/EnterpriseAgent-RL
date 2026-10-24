@@ -18,10 +18,8 @@ from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
-from enterprise_agent_rl.lora import (
-    lora_parameter_names,
-    trainable_lora_parameters,
-)
+from enterprise_agent_rl.inference_stability import attention_backend_context
+from enterprise_agent_rl.lora import lora_parameter_names, trainable_lora_parameters
 from enterprise_agent_rl.sft_training import (
     SFTDataError,
     decision_example,
@@ -488,22 +486,27 @@ def train_lora_schedule(
             for item in group:
                 model.train()
                 batch = _batch(torch_module, item, device)
-                with _autocast(
-                    torch_module,
-                    device=device,
-                    enabled=amp_active and device.startswith("cuda"),
-                ):
-                    outputs = model(
-                        input_ids=batch["input_ids"],
-                        attention_mask=batch["attention_mask"],
-                        labels=batch["labels"],
-                        use_cache=False,
-                        output_attentions=False,
-                    )
-                    loss = outputs.loss
-                if not bool(torch_module.isfinite(loss).all().item()):
-                    raise Qwen3SFTError("non_finite_loss")
-                scaler.scale(loss / accumulation_steps).backward()
+                # Keep the explicit SDPA math backend active through forward,
+                # backward, and reentrant checkpoint recomputation.  The
+                # context must surround backward as well as model() because
+                # reentrant recomputation happens during backward.
+                with attention_backend_context(torch_module, "sdpa_math"):
+                    with _autocast(
+                        torch_module,
+                        device=device,
+                        enabled=amp_active and device.startswith("cuda"),
+                    ):
+                        outputs = model(
+                            input_ids=batch["input_ids"],
+                            attention_mask=batch["attention_mask"],
+                            labels=batch["labels"],
+                            use_cache=False,
+                            output_attentions=False,
+                        )
+                        loss = outputs.loss
+                    if not bool(torch_module.isfinite(loss).all().item()):
+                        raise Qwen3SFTError("non_finite_loss")
+                    scaler.scale(loss / accumulation_steps).backward()
                 backward_count += 1
                 if gradient_injector is not None:
                     gradient_injector(model, backward_count, group_index)
