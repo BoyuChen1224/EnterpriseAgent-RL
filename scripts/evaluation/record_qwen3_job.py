@@ -33,6 +33,7 @@ def main() -> int:
     parser.add_argument("--elapsed-s", type=float)
     parser.add_argument("--partition")
     parser.add_argument("--gpu-count", type=int)
+    parser.add_argument("--code-commit")
     args = parser.parse_args()
 
     path = args.run / "job-chain.json"
@@ -71,6 +72,8 @@ def main() -> int:
         record["partition"] = args.partition
     if args.gpu_count is not None:
         record["requested_gpu_count"] = args.gpu_count
+    if args.code_commit is not None:
+        record["code_commit"] = args.code_commit
     chain["last_state"] = args.state
     _write(path, chain)
     return 0
