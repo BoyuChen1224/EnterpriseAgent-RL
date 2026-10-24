@@ -1,0 +1,50 @@
+# T-032/E-029.  Fixed, reproducible Qwen3 Runtime-aligned SFT recipe.
+# This file is deliberately separate from the eight-row feasibility smoke.
+model_config = "configs/model/qwen3-8b.toml"
+dataset = "artifacts/sft-runtime-aligned-decision-pilot/t017-r2-v1/decision/tokenized-dataset.jsonl"
+dataset_sha256 = "a5bbf4f2e0df521a6ad56885f8390b070ef3dee8cd25f0fa858e566b847e64e1"
+max_samples = 54
+max_context_tokens = 2048
+enable_thinking = false
+
+[lora]
+r = 8
+alpha = 16.0
+dropout = 0.0
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+
+[training]
+seed = 42
+microbatch = 1
+gradient_accumulation_steps = 4
+epochs = 2
+successful_optimizer_updates = 27
+learning_rate = 0.0001
+betas = [0.9, 0.999]
+eps = 0.00000001
+weight_decay = 0.0
+foreach = false
+fused = false
+clip_norm = 1.0
+amp_initial_scale = 1024.0
+max_backward = 216
+max_amp_skip_replays = 3
+checkpoint_use_reentrant = true
+checkpoint_steps = [9, 18, 27]
+
+[resources]
+account = "pi_daipeishan"
+qos = "gpuq"
+partitions = ["gpu2Q", "gpu4Q", "gpu4RQ", "gpu8Q"]
+gpus = 1
+cpus_per_task = 4
+memory = "64G"
+time_minutes = 90
+cleanup_reserve_seconds = 120
+gpu_budget_minutes = 240
+model_requests_limit = 1600
+runtime_tool_attempt_limit = 600
+verifier_limit = 48
+verifier_sql_limit = 96
+cpu_oracle_sql_limit = 32
+backward_limit = 216

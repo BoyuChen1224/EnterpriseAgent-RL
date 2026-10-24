@@ -262,3 +262,70 @@ def merge_lora_adapter(
         "delta_norm_sum": delta_norm,
         "merged_into_base": True,
     }
+
+
+def load_lora_adapter(
+    model: Any,
+    adapter_dir: Path,
+    *,
+    expected_model_id: str | None = None,
+    expected_revision: str | None = None,
+) -> dict[str, Any]:
+    """Load a saved manual-LoRA state into already-injected modules.
+
+    This is distinct from :func:`merge_lora_adapter`: checkpoints resume
+    training and must restore the low-rank tensors without adding their delta
+    to the frozen base weights.
+    """
+
+    import torch
+    from safetensors.torch import load_file
+
+    config_path = adapter_dir / "adapter_config.json"
+    weight_path = adapter_dir / "adapter_model.safetensors"
+    if not config_path.is_file() or not weight_path.is_file():
+        raise RuntimeError("adapter_files_missing")
+    config = json.loads(config_path.read_text())
+    if config.get("implementation") != "enterprise_agent_rl.manual_lora_v1":
+        raise RuntimeError("unsupported_adapter_implementation")
+    if expected_model_id and config.get("base_model_name_or_path") != expected_model_id:
+        raise RuntimeError("adapter_base_model_mismatch")
+    if expected_revision and config.get("base_model_revision") != expected_revision:
+        raise RuntimeError("adapter_base_revision_mismatch")
+    module_names = config.get("module_names")
+    if not isinstance(module_names, list) or not module_names:
+        raise RuntimeError("adapter_module_names_missing")
+    state = load_file(str(weight_path), device="cpu")
+    expected_keys = {
+        key
+        for name in module_names
+        for key in (
+            f"base_model.model.{name}.lora_A.weight",
+            f"base_model.model.{name}.lora_B.weight",
+        )
+    }
+    if set(state) != expected_keys:
+        raise RuntimeError("adapter_state_keys_mismatch")
+    loaded = 0
+    with torch.no_grad():
+        for name in module_names:
+            module = _get_submodule(model, name)
+            if not hasattr(module, "lora_A") or not hasattr(module, "lora_B"):
+                raise RuntimeError(f"adapter_target_not_injected:{name}")
+            a = state[f"base_model.model.{name}.lora_A.weight"]
+            b = state[f"base_model.model.{name}.lora_B.weight"]
+            if tuple(a.shape) != tuple(module.lora_A.shape) or tuple(b.shape) != tuple(
+                module.lora_B.shape
+            ):
+                raise RuntimeError(f"adapter_tensor_shape_mismatch:{name}")
+            module.lora_A.copy_(a.to(device=module.lora_A.device, dtype=module.lora_A.dtype))
+            module.lora_B.copy_(b.to(device=module.lora_B.device, dtype=module.lora_B.dtype))
+            loaded += 1
+    return {
+        "adapter_dir": str(adapter_dir),
+        "implementation": config["implementation"],
+        "module_count": loaded,
+        "rank": int(config["r"]),
+        "alpha": float(config["lora_alpha"]),
+        "loaded_without_base_merge": True,
+    }
