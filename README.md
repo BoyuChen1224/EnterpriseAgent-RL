@@ -30,6 +30,8 @@ SFT 使用 **54 条 train-only 逐决策监督记录、27 次 LoRA 更新**，�
 Python 3.12；从仓库根目录执行：
 
 ```bash
+git clone --branch main https://github.com/BoyuChen1224/EnterpriseAgent-RL.git
+cd EnterpriseAgent-RL
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements/cpu-py312-linux.lock
 .venv/bin/python -m pip install --no-build-isolation --no-deps -e .
@@ -43,13 +45,15 @@ PYTHONPATH=src .venv/bin/python scripts/evaluation/cpu_smoke.py
 | 功能 | 入口 |
 | --- | --- |
 | Agent / 评测 / API CLI | `python -m enterprise_agent_rl.cli --help` |
-| SFT 训练 | `scripts/training/run_sft.py` |
-| GRPO 训练 / 冻结评测 | `scripts/training/run_grpo.py` |
-| SFT N 模型服务 | `scripts/serving/run_sft_n_api.py` |
-| Slurm 示例 | `scripts/slurm/grpo_online.sbatch`、`scripts/slurm/sft_n_api.sbatch` |
+| Qwen3 Runtime 对齐 SFT | `scripts/training/run_qwen3_sft.py` |
+| Qwen3 Base/SFT 冻结面板 | `scripts/evaluation/run_qwen3_runtime_panel.py` |
+| Qwen3 分组 rollout | `scripts/evaluation/run_qwen3_grpo_rollout.py` |
+| Qwen3 固定批次 GRPO / 重载 / 对照 | `scripts/training/run_qwen3_grpo_pilot.py` |
+| 历史 1.5B 在线 GRPO / 冻结评测 | `scripts/training/run_grpo.py` |
+| 本地模型与 Agent API（1.5B profile） | `scripts/serving/run_sft_n_api.py` |
 
-GPU 入口需要对应的模型、Adapter、数据与配置资产，通过 Slurm 在兼容节点运行。模型、数据库、checkpoint、实验产物和协作提示词不随源码提交；当前 N 的完整标准化复训流程仍待整合。
+GPU 环境使用 `requirements/qwen3-py312-linux.lock`；入口参数、Slurm 示例和固定资产依赖见 [Qwen3 后训练指南](docs/qwen3-post-training.md)。源码统一维护在 `main`，模型、Adapter、数据库、checkpoint、原始产物和协作提示词保留在本地，不随源码提交。
 
 ## 技术文档
 
-[系统架构](docs/architecture.md) · [GRPO 训练与评测](docs/grpo-training.md) · [模型服务](docs/model-serving.md) · [复现与资产说明](docs/reproducibility.md) · [路线图](docs/roadmap.md)
+[Qwen3 后训练](docs/qwen3-post-training.md) · [系统架构](docs/architecture.md) · [GRPO 训练与评测](docs/grpo-training.md) · [模型服务](docs/model-serving.md) · [复现与资产说明](docs/reproducibility.md) · [路线图](docs/roadmap.md)
