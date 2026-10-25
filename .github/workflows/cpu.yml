@@ -8,6 +8,8 @@ jobs:
       MKL_NUM_THREADS: '1'
       OPENBLAS_NUM_THREADS: '1'
       CUDA_VISIBLE_DEVICES: ''
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

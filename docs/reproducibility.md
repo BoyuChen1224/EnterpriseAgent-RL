@@ -23,7 +23,7 @@ cd EnterpriseAgent-RL
 | --- | --- |
 | Python | 源码声明 3.11–3.12；已审核运行环境为 Python 3.12 |
 | CPU 依赖 | requirements/cpu-py312-linux.lock |
-| CPU 后训练测试 | requirements/cpu-training-py312-linux.lock；增加固定 CPU 版 Torch 2.5.1+cpu 与 NumPy，不安装 CUDA 或下载模型 |
+| CPU 后训练测试 | requirements/cpu-training-py312-linux.lock；CPU 版 Torch 2.5.1+cpu、Transformers 4.51.3、Safetensors 和 NumPy；随机小模型离线测试，不安装 CUDA 或下载权重 |
 | Qwen3 GPU 依赖 | requirements/qwen3-py312-linux.lock；Torch 2.5.1+cu121、Transformers 4.51.3、tokenizers 0.21.1；.venv-qwen3/bin/python |
 | 历史 1.5B GPU 依赖 | requirements/gpu-py312-linux.lock；Torch 2.2.2+cu121、Transformers 4.46.3、tokenizers 0.20.3；.venv-gpu/bin/python |
 | 当前 GPU 数值路径 | Qwen3 revision b968826d9c46dd6066d109eabc6255188de91218，FP16 + SDPA math、thinking-off；历史 1.5B revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306 |
