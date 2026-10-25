@@ -52,9 +52,7 @@ def _guard(path: Path, config, *, job_id: str = "TEST") -> BudgetGuard:
 
 
 def test_seed_formula_and_smoke_config_are_not_hardcoded_to_four_groups(tmp_path):
-    config, _ = load_config(
-        SMOKE_CONFIG, RunContext(REPO_ROOT, tmp_path / "smoke", SMOKE_CONFIG)
-    )
+    config, _ = load_config(SMOKE_CONFIG, RunContext(REPO_ROOT, tmp_path / "smoke", SMOKE_CONFIG))
     assert config.group_count == 2
     assert [
         _seed_for(0, group, sample, 106, config.group_count, config.samples_per_task)
@@ -116,9 +114,7 @@ class _FakeGenerationModel:
 
 
 def test_hf_generation_separates_top_k_and_greedy_evaluation(tmp_path):
-    config, _ = load_config(
-        DEFAULT_CONFIG, RunContext(REPO_ROOT, tmp_path / "run", DEFAULT_CONFIG)
-    )
+    config, _ = load_config(DEFAULT_CONFIG, RunContext(REPO_ROOT, tmp_path / "run", DEFAULT_CONFIG))
     guard = _guard(tmp_path / "budget.json", config)
     model = _FakeGenerationModel()
     policy = SimpleNamespace(
@@ -134,9 +130,7 @@ def test_hf_generation_separates_top_k_and_greedy_evaluation(tmp_path):
         public_task={"task_id": "task", "prompt": "prompt"},
     )
     try:
-        training_engine = HfRolloutEngine(
-            policy=policy, run_dir=tmp_path / "run", config=config
-        )
+        training_engine = HfRolloutEngine(policy=policy, run_dir=tmp_path / "run", config=config)
         training = training_engine.generate(
             messages=[{"role": "user", "content": "prompt"}],
             task=task,
@@ -211,9 +205,7 @@ class _OneSkipScaler:
 
 
 def test_production_qwen_update_freezes_base_and_replays_one_amp_skip(tmp_path):
-    config, _ = load_config(
-        DEFAULT_CONFIG, RunContext(REPO_ROOT, tmp_path / "run", DEFAULT_CONFIG)
-    )
+    config, _ = load_config(DEFAULT_CONFIG, RunContext(REPO_ROOT, tmp_path / "run", DEFAULT_CONFIG))
     guard = _guard(tmp_path / "budget.json", config)
     policy = tiny_qwen_policy(tmp_path / "run", guard, config)
     policy.scaler = _OneSkipScaler()
@@ -260,9 +252,7 @@ def test_production_qwen_update_freezes_base_and_replays_one_amp_skip(tmp_path):
 def test_step_one_and_step_three_resume_without_repeating_rollouts(
     tmp_path, failed_step, second_round_calls
 ):
-    config, _ = load_config(
-        DEFAULT_CONFIG, RunContext(REPO_ROOT, tmp_path / "run", DEFAULT_CONFIG)
-    )
+    config, _ = load_config(DEFAULT_CONFIG, RunContext(REPO_ROOT, tmp_path / "run", DEFAULT_CONFIG))
     run_dir = tmp_path / "run"
     fail_marker = tmp_path / "failed-once"
     captures: list[tuple[object, object]] = []
@@ -328,9 +318,7 @@ def test_watchdog_persists_stop_before_interrupting_callable(tmp_path):
 
 
 def test_evaluation_arms_have_independent_snapshots_and_aggregation(tmp_path):
-    config, _ = load_config(
-        DEFAULT_CONFIG, RunContext(REPO_ROOT, tmp_path / "run", DEFAULT_CONFIG)
-    )
+    config, _ = load_config(DEFAULT_CONFIG, RunContext(REPO_ROOT, tmp_path / "run", DEFAULT_CONFIG))
 
     def factory(guard, context, _config):
         return TinyPolicy(context.run_dir, guard), FakeRolloutEngine(), FakeWorker()
@@ -397,6 +385,7 @@ def test_missing_worker_audit_is_null_not_zero(tmp_path):
     assert result["runtime_worker_sql_count"] is None
     assert result["runtime_worker_non_sql_count"] is None
     assert result["verifier_sql_count"] is None
-    assert ScoreResult.from_dict(
-        {"episode_id": "e", "task_id": "t", "status": "unknown"}
-    ).worker_count is None
+    assert (
+        ScoreResult.from_dict({"episode_id": "e", "task_id": "t", "status": "unknown"}).worker_count
+        is None
+    )

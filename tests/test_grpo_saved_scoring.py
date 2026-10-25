@@ -93,9 +93,7 @@ def test_pair_is_incomplete_for_task_or_qualification_conflicts(mutator, expecte
     result = three_arm_comparison(base, n, rl, expected_count=20)
 
     assert result["pair_status"]["N_minus_Base"] == "INCOMPLETE"
-    assert any(
-        expected_reason in reason for reason in result["N_minus_Base"]["reasons"]
-    )
+    assert any(expected_reason in reason for reason in result["N_minus_Base"]["reasons"])
     assert result["N_minus_Base"]["planned_denominator"] == 20
     assert result["N_minus_Base"]["successes"] is None
 
@@ -163,9 +161,12 @@ def test_saved_score_business_false_is_persisted_and_idempotent(tmp_path):
     assert ledger["new_verifier_calls"] == 1
     assert ledger["new_verifier_sql"] == 0
     assert len(ledger["attempts"]) == 1
-    assert json.loads((output / "verifier" / "attempt-01" / "verifier-output.json").read_text())[
-        "reward_result"
-    ]["success"] is False
+    assert (
+        json.loads((output / "verifier" / "attempt-01" / "verifier-output.json").read_text())[
+            "reward_result"
+        ]["success"]
+        is False
+    )
 
 
 def test_merged_jsonl_replay_ignores_key_order_but_rejects_data_conflict(tmp_path):

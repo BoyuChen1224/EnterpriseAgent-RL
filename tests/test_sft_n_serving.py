@@ -319,9 +319,7 @@ class FakeModelHTTP:
                         )
                     elif history_count == 3:
                         columns = (
-                            ["customer", "region_id"]
-                            if "客户表字段" in prompt
-                            else ["customer"]
+                            ["customer", "region_id"] if "客户表字段" in prompt else ["customer"]
                         )
                         content = json.dumps(
                             {
@@ -489,8 +487,7 @@ def test_real_http_local_policy_agent_api_and_business_technical_split(
                 assert status["reward"]["success"] is True
                 trajectory = client.get(f"/tasks/{submitted['id']}/trajectory").json()
                 assert (
-                    trajectory["policy_metadata"]["model_version"]
-                    == service_profile.model_version
+                    trajectory["policy_metadata"]["model_version"] == service_profile.model_version
                 )
                 assert trajectory["database_sha256"] == service_profile.database_physical_sha256
                 event_ids = [

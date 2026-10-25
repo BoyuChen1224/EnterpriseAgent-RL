@@ -410,9 +410,9 @@ def test_artifact_manifest_excludes_source_snapshot_and_mutable_command_ledger(t
     from scripts.evaluation.run_qwen3_grpo_rollout import _write_artifact_manifest
 
     (tmp_path / "result.json").write_text('{"ok": true}\n', encoding="utf-8")
-    (tmp_path / "commands.json").write_text('{}\n', encoding="utf-8")
+    (tmp_path / "commands.json").write_text("{}\n", encoding="utf-8")
     (tmp_path / "source-snapshot").mkdir()
-    (tmp_path / "source-snapshot/manifest.json").write_text('{}\n', encoding="utf-8")
+    (tmp_path / "source-snapshot/manifest.json").write_text("{}\n", encoding="utf-8")
 
     manifest = _write_artifact_manifest(tmp_path)
     assert manifest["file_count"] == 1

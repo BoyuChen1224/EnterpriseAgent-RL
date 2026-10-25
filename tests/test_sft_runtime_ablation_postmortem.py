@@ -78,9 +78,7 @@ def test_saved_artifact_postmortem_matches_all_group_summaries():
     root = ROOT / "artifacts/sft-runtime-ablation/20261017T130311Z-sft-runtime-protocol-ablation"
     postmortem = build_postmortem(root)
     assert postmortem["status"] == "SFT_RUNTIME_POSTMORTEM_COMPLETE"
-    assert all(
-        check["all_scalar_metrics_match"] for check in postmortem["metric_checks"].values()
-    )
+    assert all(check["all_scalar_metrics_match"] for check in postmortem["metric_checks"].values())
     assert postmortem["b_initial_observation_analysis"]["schema_before_sql_tasks"] == [
         "train-0-top",
         "train-1-top",

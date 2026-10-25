@@ -72,9 +72,7 @@ def test_reference_sql_teacher_rejects_non_train_task(frozen_benchmark):
         ReferenceSQLTeacherPolicy(validation_task)
 
 
-def test_mixed_teacher_sources_are_allowed_but_local_llm_is_rejected(
-    frozen_benchmark, tmp_path
-):
+def test_mixed_teacher_sources_are_allowed_but_local_llm_is_rejected(frozen_benchmark, tmp_path):
     manifest_path, database_root, manifest = frozen_benchmark
     output = tmp_path / "output"
     trajectories = tmp_path / "trajectories"
@@ -98,9 +96,7 @@ def test_mixed_teacher_sources_are_allowed_but_local_llm_is_rejected(
     teacher_task = BenchmarkTask.model_validate(teacher_record["task"])
     teacher_database = database_root / f"{teacher_record['database_id']}.sqlite3"
     teacher = run_reference_sql_teacher(teacher_task, teacher_database, Settings())
-    teacher = teacher.model_copy(
-        update={"reward": verify(teacher_task, teacher, teacher_database)}
-    )
+    teacher = teacher.model_copy(update={"reward": verify(teacher_task, teacher, teacher_database)})
     store.save(teacher)
 
     result = build_sft_dataset(
@@ -136,8 +132,5 @@ def test_mixed_teacher_sources_are_allowed_but_local_llm_is_rejected(
     )
     assert rejected["trajectory_count"] == 0
     assert (
-        rejected["quality_report"]["rejection_reason_counts"][
-            "trajectory_source_not_allowed"
-        ]
-        == 1
+        rejected["quality_report"]["rejection_reason_counts"]["trajectory_source_not_allowed"] == 1
     )

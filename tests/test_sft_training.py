@@ -47,9 +47,7 @@ class FakeTokenizer:
     def apply_chat_template(self, conversation, *, tokenize, add_generation_prompt):
         rendered = []
         for message in conversation:
-            rendered.extend(
-                [f"<{message['role']}>", message["content"], "</message>"]
-            )
+            rendered.extend([f"<{message['role']}>", message["content"], "</message>"])
         if add_generation_prompt:
             rendered.extend(["<assistant>"])
         if tokenize:

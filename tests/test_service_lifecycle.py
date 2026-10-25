@@ -32,7 +32,7 @@ SPEC.loader.exec_module(launcher)
 
 
 FAKE_SERVER = textwrap.dedent(
-    r'''
+    r"""
     import json
     import os
     import sys
@@ -109,7 +109,7 @@ FAKE_SERVER = textwrap.dedent(
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
     server.serve_forever()
-    '''
+    """
 )
 
 
@@ -386,9 +386,7 @@ def test_main_default_allocates_unique_runs_and_rejects_existing_explicit_path(
     assert invoke() == 0
     assert invoke() == 0
     run_dirs = sorted(
-        path
-        for path in default_root.iterdir()
-        if path.is_dir() and path.name != "prior-run"
+        path for path in default_root.iterdir() if path.is_dir() and path.name != "prior-run"
     )
     assert len(run_dirs) == 2
     assert run_dirs[0] != run_dirs[1]
@@ -407,9 +405,7 @@ def test_main_default_allocates_unique_runs_and_rejects_existing_explicit_path(
 
 
 def test_second_task_failure_keeps_first_panel_and_marks_unknown(tmp_path):
-    run_dir, profile, processes, _records = start_fake_pair(
-        tmp_path, mode="second_submit_failure"
-    )
+    run_dir, profile, processes, _records = start_fake_pair(tmp_path, mode="second_submit_failure")
     try:
         clock = LifecycleClock(soft_cutoff_s=5, cleanup_reserve_s=2)
         wait_pair(profile, processes, clock)
@@ -455,8 +451,7 @@ def test_global_deadline_interrupts_real_slow_poll_and_retains_unknown(tmp_path)
         summary = json.loads((run_dir / "summary.json").read_text())
         assert summary["unknown_count"] == 2
         assert all(
-            json.loads((run_dir / "panels" / f"{task_id}.json").read_text())["status"]
-            == "unknown"
+            json.loads((run_dir / "panels" / f"{task_id}.json").read_text())["status"] == "unknown"
             for task_id in profile.benchmark_task_ids
         )
     finally:
@@ -493,9 +488,7 @@ def test_child_early_exit_is_a_child_failure(tmp_path):
     clock = LifecycleClock(soft_cutoff_s=2, cleanup_reserve_s=1)
     time.sleep(0.05)
     with pytest.raises(ServiceProcessExited, match="model_exited"):
-        launcher.wait_for_ready(
-            "http://127.0.0.1:1/health", process, 1, "model", clock=clock
-        )
+        launcher.wait_for_ready("http://127.0.0.1:1/health", process, 1, "model", clock=clock)
 
 
 @pytest.mark.parametrize(("signum", "expected_exit"), [(signal.SIGTERM, 143), (signal.SIGINT, 130)])
@@ -509,7 +502,7 @@ def test_real_signal_is_forwarded_to_owned_group_and_kill_is_bounded(
         "    time.sleep(1)"
     )
     script = textwrap.dedent(
-        f'''
+        f"""
         import importlib.util, json, signal, subprocess, sys, time
         from pathlib import Path
         path = Path({str(LAUNCHER_PATH)!r})
@@ -531,7 +524,7 @@ def test_real_signal_is_forwarded_to_owned_group_and_kill_is_bounded(
             returncode = module.stop_process_group(child, grace_s=0.1, evidence=evidence)
             print(json.dumps({{"returncode": returncode, "evidence": evidence}}), flush=True)
             raise SystemExit(exc.exit_code)
-        '''
+        """
     )
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT / "src") + os.pathsep + env.get("PYTHONPATH", "")
