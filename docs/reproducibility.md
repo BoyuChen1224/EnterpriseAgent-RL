@@ -1,6 +1,15 @@
 # 可复现运行入口与资产边界
 
-本页是当前源码和已审核证据的操作索引，不承诺 fresh checkout 一键完成全量复训。所有命令默认从仓库根目录运行：
+源码统一维护在 `main`；历史阶段的代码保留在 commit 历史中。获取完整当前源码：
+
+```bash
+git clone --branch main https://github.com/BoyuChen1224/EnterpriseAgent-RL.git
+cd EnterpriseAgent-RL
+```
+
+当前 Qwen3-8B 的环境、固定训练/评测入口和资产依赖见 [Qwen3 后训练指南](qwen3-post-training.md)。本页同时保留历史 1.5B 入口，下面标注 T-017～T-029、E-026/E-027、`.venv-gpu` 的命令均属于该历史模型链。
+
+本页不承诺 fresh checkout 一键完成全量复训。历史集群根目录为：
 
 ~~~text
 /public/home/hpc204166/chenboyu/EnterpriseAgent-RL
@@ -14,9 +23,9 @@
 | --- | --- |
 | Python | 源码声明 3.11–3.12；已审核运行环境为 Python 3.12 |
 | CPU 依赖 | requirements/cpu-py312-linux.lock |
-| GPU 依赖 | requirements/gpu-py312-linux.lock；Torch 2.2.2+cu121、Transformers 4.46.3、tokenizers 0.20.3 |
-| GPU 数值路径 | Qwen revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306，FP16 + sdpa_math |
-| 本仓库核对解释器 | .venv-gpu/bin/python；T-029 help 使用该入口，不 resolve venv symlink |
+| Qwen3 GPU 依赖 | requirements/qwen3-py312-linux.lock；Torch 2.5.1+cu121、Transformers 4.51.3、tokenizers 0.21.1；.venv-qwen3/bin/python |
+| 历史 1.5B GPU 依赖 | requirements/gpu-py312-linux.lock；Torch 2.2.2+cu121、Transformers 4.46.3、tokenizers 0.20.3；.venv-gpu/bin/python |
+| 当前 GPU 数值路径 | Qwen3 revision b968826d9c46dd6066d109eabc6255188de91218，FP16 + SDPA math、thinking-off；历史 1.5B revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306 |
 | 输出原则 | 每次新命令使用一个不存在的显式 run/output 目录；不覆盖旧 artifact |
 | 数据原则 | train supervision 只来自获准 train 轨迹；reference SQL/expected answer 不进入模型 messages |
 
@@ -56,13 +65,13 @@ PYTHONPATH=src .venv-gpu/bin/python -m enterprise_agent_rl.cli --config configs/
 
 可选的错误恢复 fixture 使用 policy fixture-recovery 和不同 output 目录。不要把 CPU fixture 的任务数量、SQL Action/SQL_OK 或 recovery count 填入 E-026 的 LLM 成功率表。CPU fixture 的公开任务为 train 4、validation 1、test 5；E-026 是 20 个 validation task × 3 arms。
 
-## 历史 SFT 与 current N 的实际来源
+## 历史 1.5B SFT 与 N 的实际来源
 
 ### 历史 SFT pilot 入口
 
 源码入口为 scripts/training/run_sft.py，Slurm wrapper 为 scripts/slurm/sft_train.sbatch。wrapper 的默认输入是 dataset.jsonl、dataset-metadata.json 和 artifacts/model-cache。它要求 SLURM_JOB_ID，默认 3 epochs、batch size 1、gradient accumulation 4、learning rate 1e-4、seed 42、LoRA r=8/alpha=16/dropout=0.05，并写新的 artifacts/sft-pilot-<jobid>/。这是一个受控 pilot/训练实现，不是 fresh checkout 自动准备数据、cache、数据库和 N 权重的完整复训器。T-029 没有运行 preflight 或 training。
 
-### current N lineage
+### 历史 N lineage
 
 E-026/E-027 使用的 N 不是重新由 T-029 生成的 adapter。来源是：
 
@@ -152,9 +161,10 @@ fresh checkout 包含已提交的源码、公开配置和技术手册，不包�
 
 以下是 ignored 或外部资产，缺失时应显式报告：
 
+- Qwen3 cache、54 条 train 决策、T-032 SFT parent、T-033 token rollout 和 T-034 final delta，以及各自的固定 hash/manifest；
 - model cache manifest、Qwen tokenizer/weights；
-- T-017-R2 N adapter 及 config；
-- T-023/E-025 fixed RL delta；
+- 历史 1.5B T-017-R2 N adapter 及 config；
+- 历史 1.5B T-023/E-025 fixed RL delta；
 - train/evaluation database、benchmark records、public panel、private task plan；
 - train-only dataset/metadata、optimizer/scheduler/scaler/RNG checkpoint；
 - historical run manifests、trajectory/event/SQL audit and scheduler accounting。
