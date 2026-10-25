@@ -23,6 +23,7 @@ cd EnterpriseAgent-RL
 | --- | --- |
 | Python | 源码声明 3.11–3.12；已审核运行环境为 Python 3.12 |
 | CPU 依赖 | requirements/cpu-py312-linux.lock |
+| CPU 后训练测试 | requirements/cpu-training-py312-linux.lock；增加固定 CPU 版 Torch 2.5.1+cpu 与 NumPy，不安装 CUDA 或下载模型 |
 | Qwen3 GPU 依赖 | requirements/qwen3-py312-linux.lock；Torch 2.5.1+cu121、Transformers 4.51.3、tokenizers 0.21.1；.venv-qwen3/bin/python |
 | 历史 1.5B GPU 依赖 | requirements/gpu-py312-linux.lock；Torch 2.2.2+cu121、Transformers 4.46.3、tokenizers 0.20.3；.venv-gpu/bin/python |
 | 当前 GPU 数值路径 | Qwen3 revision b968826d9c46dd6066d109eabc6255188de91218，FP16 + SDPA math、thinking-off；历史 1.5B revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306 |
@@ -30,6 +31,8 @@ cd EnterpriseAgent-RL
 | 数据原则 | train supervision 只来自获准 train 轨迹；reference SQL/expected answer 不进入模型 messages |
 
 没有安装完整 TRL Trainer；formal GRPO 使用仓库内 local adapter/torch backend。没有 vLLM、FlashAttention-2 默认路径、PG 后端、外部队列或鉴权服务。
+
+GitHub Actions 使用 CPU 后训练锁文件执行 `ruff check .`、`ruff format --check .`、`pytest -q` 和 CPU smoke。单元测试在临时目录生成数据、数据库与虚拟环境；`local_artifacts` 标记仅用于两项历史实验包核对，缺少 Git-ignored 原包时明确 skip，保留普通数据校验、梯度、恢复和服务测试。可通过 `pytest -m local_artifacts` 单独选择历史核对；它不下载或重建原实验。
 
 ## 入口与资产总表
 
