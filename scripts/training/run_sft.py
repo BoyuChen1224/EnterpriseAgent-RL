@@ -429,9 +429,7 @@ def main() -> int:
     trainable = trainable_lora_parameters(model)
     trainable_names = lora_parameter_names(model)
     expected_lora_names = {
-        f"{module_name}.{suffix}"
-        for module_name in module_names
-        for suffix in ("lora_A", "lora_B")
+        f"{module_name}.{suffix}" for module_name in module_names for suffix in ("lora_A", "lora_B")
     }
     if set(trainable_names) != expected_lora_names:
         raise RuntimeError(
@@ -444,9 +442,7 @@ def main() -> int:
         if parameter.requires_grad and name not in expected_lora_names
     ]
     if unexpected_trainable:
-        raise RuntimeError(
-            "unexpected_base_parameters_trainable:" + repr(unexpected_trainable[:8])
-        )
+        raise RuntimeError("unexpected_base_parameters_trainable:" + repr(unexpected_trainable[:8]))
     trainable_count = sum(int(parameter.numel()) for parameter in trainable)
     total_parameter_count = sum(int(parameter.numel()) for parameter in model.parameters())
     trainable_ratio = trainable_count / total_parameter_count if total_parameter_count else 0.0
@@ -472,9 +468,7 @@ def main() -> int:
     if not optimizer.param_groups or optimizer_parameter_count <= 0:
         raise RuntimeError("optimizer_parameter_groups_empty")
     if {
-        id(parameter)
-        for group in optimizer.param_groups
-        for parameter in group.get("params", [])
+        id(parameter) for group in optimizer.param_groups for parameter in group.get("params", [])
     } != {id(parameter) for parameter in trainable}:
         raise RuntimeError("optimizer_parameters_do_not_match_lora_parameters")
 
@@ -566,9 +560,8 @@ def main() -> int:
             epoch_losses.append(loss_value)
             scaler.scale(loss / args.gradient_accumulation_steps).backward()
             should_step = (
-                (batch_start // args.batch_size + 1) % args.gradient_accumulation_steps == 0
-                or batch_start + args.batch_size >= len(order)
-            )
+                batch_start // args.batch_size + 1
+            ) % args.gradient_accumulation_steps == 0 or batch_start + args.batch_size >= len(order)
             if should_step:
                 scaler.unscale_(optimizer)
                 grad_norm = torch.nn.utils.clip_grad_norm_(trainable, args.max_grad_norm)

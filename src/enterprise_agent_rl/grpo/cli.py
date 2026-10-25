@@ -92,9 +92,7 @@ def _cpu_frozen_evaluation_factory(arm, _guard, context, _config):
     model_ref_id = f"cpu-frozen-{arm}"
     return {
         "policy": None,
-        "engine": EvidenceFakeRolloutEngine(
-            context.run_dir, arm=arm, model_ref_id=model_ref_id
-        ),
+        "engine": EvidenceFakeRolloutEngine(context.run_dir, arm=arm, model_ref_id=model_ref_id),
         "worker": FakeWorker(),
         "metadata": {
             "evaluation_arm": arm,
@@ -582,9 +580,7 @@ def _write_frozen_asset_preflight(
     for row in database_evidence:
         database_id = Path(row["source"]).stem
         expected = (
-            expected_physical.get(database_id)
-            if isinstance(expected_physical, dict)
-            else None
+            expected_physical.get(database_id) if isinstance(expected_physical, dict) else None
         )
         if expected and row["source_sha256"] != expected:
             raise RuntimeError(
@@ -595,9 +591,7 @@ def _write_frozen_asset_preflight(
             expected_logical.get(database_id) if isinstance(expected_logical, dict) else None
         )
         if expected_logical_value and logical != expected_logical_value:
-            raise RuntimeError(
-                f"validation_database_logical_fingerprint_mismatch:{database_id}"
-            )
+            raise RuntimeError(f"validation_database_logical_fingerprint_mismatch:{database_id}")
         logical_rows[database_id] = logical
         database_rows.append(
             {
@@ -662,9 +656,7 @@ def _write_frozen_asset_preflight(
         "tokenizer": {
             "status": "DEFERRED_TO_REAL_EVALUATION_MODEL_LOAD",
             "raw_sha256": str(evaluation.get("tokenizer_raw_template_sha256", "")),
-            "canonical_json_sha256": str(
-                evaluation.get("tokenizer_canonical_json_sha256", "")
-            ),
+            "canonical_json_sha256": str(evaluation.get("tokenizer_canonical_json_sha256", "")),
         },
         "model": {
             "model_id": model_cfg["model_id"],
@@ -693,12 +685,8 @@ def _write_cpu_checks(context: RunContext, result: dict[str, Any]) -> None:
             "arms": {
                 arm: {
                     "fresh_base": details.get("arm_metadata", {}).get("fresh_base"),
-                    "parent_merge_count": details.get("arm_metadata", {}).get(
-                        "parent_merge_count"
-                    ),
-                    "delta_merge_count": details.get("arm_metadata", {}).get(
-                        "delta_merge_count"
-                    ),
+                    "parent_merge_count": details.get("arm_metadata", {}).get("parent_merge_count"),
+                    "delta_merge_count": details.get("arm_metadata", {}).get("delta_merge_count"),
                     "planned": details.get("planned"),
                     "scored": details.get("scored"),
                     "unknown": details.get("unknown"),
@@ -885,8 +873,7 @@ def _offline_model_evidence_check(
         response_path = attempt.get("response_path")
         event_path = attempt.get("engine_event_path")
         if not all(
-            isinstance(value, str) and value
-            for value in (request_path, response_path, event_path)
+            isinstance(value, str) and value for value in (request_path, response_path, event_path)
         ):
             raise RuntimeError(f"offline_qualification_paths_missing:{request_id}")
         request_file = safe_relative_path(run_dir, request_path)
@@ -1032,9 +1019,7 @@ def _append_missing_frozen_results(
     return appended
 
 
-def _ensure_frozen_arm_manifests(
-    run_dir: Path, task_ids: list[str], *, stop_reason: str
-) -> None:
+def _ensure_frozen_arm_manifests(run_dir: Path, task_ids: list[str], *, stop_reason: str) -> None:
     base_manifest = read_json(run_dir / "evaluation" / "Base" / "arm-manifest.json")
     if not isinstance(base_manifest, dict):
         raise RuntimeError("base_arm_manifest_missing_for_finalization")
@@ -1132,9 +1117,7 @@ def _write_frozen_allocation_ledger(
     for prior in chain.get("prior", []) if isinstance(chain, dict) else []:
         prior_run = Path(str(prior.get("run_dir", "")))
         wrapper = read_json(prior_run / "logs" / "wrapper-elapsed.json") if prior_run else None
-        prior_wrapper_exit = (
-            wrapper.get("exit_code") if isinstance(wrapper, dict) else None
-        )
+        prior_wrapper_exit = wrapper.get("exit_code") if isinstance(wrapper, dict) else None
         rows.append(
             {
                 "job_id": prior.get("job_id"),
@@ -1290,15 +1273,12 @@ def _trajectory_worker_summary(run_dir: Path, relative_path: str) -> dict[str, A
             "termination_reason": trajectory.get("terminal_reason"),
         }
     sql_steps = [
-        step
-        for step in steps
-        if isinstance(step, dict) and step.get("tool_name") == "sql"
+        step for step in steps if isinstance(step, dict) and step.get("tool_name") == "sql"
     ]
     non_sql_steps = [
         step
         for step in steps
-        if isinstance(step, dict)
-        and step.get("tool_name") in {"schema", "dictionary", "check"}
+        if isinstance(step, dict) and step.get("tool_name") in {"schema", "dictionary", "check"}
     ]
 
     def _is_budget_rejection(step: dict[str, Any]) -> bool:
@@ -1321,9 +1301,7 @@ def _trajectory_worker_summary(run_dir: Path, relative_path: str) -> dict[str, A
     }
 
 
-def _write_frozen_arm_audits(
-    run_dir: Path, task_ids: list[str], metrics: dict[str, Any]
-) -> None:
+def _write_frozen_arm_audits(run_dir: Path, task_ids: list[str], metrics: dict[str, Any]) -> None:
     """Write compact per-task worker and qualification indexes for review."""
 
     for arm in ("Base", "N", "RL"):
@@ -1333,9 +1311,7 @@ def _write_frozen_arm_audits(
             for row in read_jsonl(index)
             if row.get("record_type", "RESULT") == "RESULT"
         }
-        aggregate_rows = {
-            str(row.get("task_id")): row for row in metrics[arm].get("entries", [])
-        }
+        aggregate_rows = {str(row.get("task_id")): row for row in metrics[arm].get("entries", [])}
         worker_rows: list[dict[str, Any]] = []
         qualification_rows: list[dict[str, Any]] = []
         for task_id in task_ids:
@@ -1437,9 +1413,7 @@ def _write_frozen_report(
     budget = read_json(run_dir / "budget-state.json") or {}
     status = read_json(run_dir / "run-status.json") or {}
     commands = read_json(run_dir / "commands.json") or {}
-    counters_json = json.dumps(
-        budget.get("call_counters", {}), ensure_ascii=False, sort_keys=True
-    )
+    counters_json = json.dumps(budget.get("call_counters", {}), ensure_ascii=False, sort_keys=True)
     allocation_json = json.dumps(allocation, ensure_ascii=False, sort_keys=True)
     lines = [
         "# T-024 / E-026 Frozen Base/SFT/RL Evaluation",
@@ -1498,9 +1472,7 @@ def _write_frozen_report(
             f"{value.get('runtime_worker_non_sql_count')}",
             value.get("verifier_sql_count"),
         ]
-        lines.append(
-            "| " + " | ".join(str(cell) for cell in cells) + " |"
-        )
+        lines.append("| " + " | ".join(str(cell) for cell in cells) + " |")
     lines.extend(
         [
             "",
@@ -1629,9 +1601,7 @@ def _cmd_finalize_frozen(args: argparse.Namespace) -> int:
         index = run_dir / "evaluation" / arm / "verifier-results.jsonl"
         rows = read_jsonl(index)
         observed = {
-            str(row.get("task_id"))
-            for row in rows
-            if row.get("record_type", "RESULT") == "RESULT"
+            str(row.get("task_id")) for row in rows if row.get("record_type", "RESULT") == "RESULT"
         }
         if observed != set(task_ids):
             raise RuntimeError(f"frozen_finalization_task_set_mismatch:{arm}")

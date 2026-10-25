@@ -140,8 +140,7 @@ def _load_model(torch: Any, transformers: Any, cfg: ModelSettings, cache: Path):
         raise RuntimeError("output_attentions_must_be_false_for_sdpa")
     if getattr(model.config, "num_hidden_layers", None) != EXPECTED_LAYERS:
         raise RuntimeError(
-            "qwen3_layer_count_mismatch:"
-            f"{getattr(model.config, 'num_hidden_layers', None)}"
+            f"qwen3_layer_count_mismatch:{getattr(model.config, 'num_hidden_layers', None)}"
         )
     return model
 
@@ -530,9 +529,7 @@ def main() -> int:
     model.config.use_cache = False
     if not hasattr(model, "gradient_checkpointing_enable"):
         raise RuntimeError("gradient_checkpointing_not_supported")
-    model.gradient_checkpointing_enable(
-        gradient_checkpointing_kwargs={"use_reentrant": True}
-    )
+    model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": True})
     if not bool(getattr(model, "is_gradient_checkpointing", False)):
         raise RuntimeError("gradient_checkpointing_not_enabled")
     if not hasattr(model, "enable_input_require_grads"):
@@ -589,9 +586,7 @@ def main() -> int:
         fused=False,
     )
     optimizer_ids = {
-        id(parameter)
-        for group in optimizer.param_groups
-        for parameter in group["params"]
+        id(parameter) for group in optimizer.param_groups for parameter in group["params"]
     }
     if optimizer_ids != {id(parameter) for parameter in trainable}:
         raise RuntimeError("optimizer_parameters_do_not_match_lora_parameters")
@@ -763,9 +758,7 @@ def main() -> int:
         "lora_changed_parameters": lora_changed[:16],
         "gradients_finite": all(item.get("gradients_finite", True) for item in update_metrics),
         "overall_lora_gradient_norm_positive": all(
-            item["grad_norm_unscaled"] > 0
-            for item in update_metrics
-            if item.get("successful")
+            item["grad_norm_unscaled"] > 0 for item in update_metrics if item.get("successful")
         ),
         "attention_context_scope": "forward_backward_and_checkpoint_recompute",
         "gradient_checkpointing_use_reentrant": True,

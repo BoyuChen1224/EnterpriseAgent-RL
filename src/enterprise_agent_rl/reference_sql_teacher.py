@@ -147,8 +147,10 @@ class ReferenceSQLTeacherPolicy:
 
         final_sql = reference_steps[-1]
         columns = final_sql.tool_result.result.get("columns")
-        if not isinstance(columns, list) or not columns or not all(
-            isinstance(column, str) for column in columns
+        if (
+            not isinstance(columns, list)
+            or not columns
+            or not all(isinstance(column, str) for column in columns)
         ):
             raise ReferenceSQLTeacherError("reference_sql_columns_missing")
         if not any(
@@ -164,9 +166,7 @@ class ReferenceSQLTeacherPolicy:
         raise ReferenceSQLTeacherError("teacher_state_unreachable")
 
 
-def reference_sql_execution_status(
-    trajectory: Trajectory, reference_sql: str
-) -> dict[str, Any]:
+def reference_sql_execution_status(trajectory: Trajectory, reference_sql: str) -> dict[str, Any]:
     """Summarize the SQL action's actual runtime observation without re-executing it."""
 
     matching = [
@@ -203,9 +203,7 @@ def reference_sql_execution_status(
     }
 
 
-def with_reference_sql_provenance(
-    trajectory: Trajectory, task: BenchmarkTask
-) -> Trajectory:
+def with_reference_sql_provenance(trajectory: Trajectory, task: BenchmarkTask) -> Trajectory:
     """Attach auditable supervision metadata without storing raw reference SQL."""
 
     return trajectory.model_copy(

@@ -134,9 +134,7 @@ def validate_values(values: dict[str, Any]) -> None:
     seed_end = _require(rollout, "seed_end", int)
     expected_seed_end = (
         seed_start
-        + int(rollout["rounds"])
-        * int(rollout["group_count"])
-        * int(rollout["samples_per_task"])
+        + int(rollout["rounds"]) * int(rollout["group_count"]) * int(rollout["samples_per_task"])
         - 1
     )
     if seed_end != expected_seed_end:

@@ -243,9 +243,8 @@ def aggregate_source(
                     "trajectory_path": path,
                     "sql": sql,
                     "runtime_worker_sql_count": row.get(
-                        "runtime_worker_sql_count", sql["worker_count"]
-                        if sql["worker_count_known"]
-                        else None
+                        "runtime_worker_sql_count",
+                        sql["worker_count"] if sql["worker_count_known"] else None,
                     ),
                     "runtime_worker_non_sql_count": row.get("runtime_worker_non_sql_count"),
                     "verifier_sql_count": row.get("verifier_sql_count"),
@@ -275,9 +274,7 @@ def aggregate_source(
         raise EvidenceError(f"too_many_formal_records:{expected_count}:{scored_count}")
     successes = sum(int(entry["success"]) for entry in entries)
     worker_count = (
-        sum(worker_values)
-        if len(worker_values) == scored_count and scored_count
-        else None
+        sum(worker_values) if len(worker_values) == scored_count and scored_count else None
     )
     runtime_worker_non_sql_count = (
         sum(non_sql_worker_values)
@@ -450,9 +447,9 @@ def three_arm_comparison(
     def _pair_contract(left: str, right: str) -> dict[str, Any]:
         left_contract = contracts[left]
         right_contract = contracts[right]
-        reasons = [
-            f"{left}:{reason}" for reason in left_contract["reasons"]
-        ] + [f"{right}:{reason}" for reason in right_contract["reasons"]]
+        reasons = [f"{left}:{reason}" for reason in left_contract["reasons"]] + [
+            f"{right}:{reason}" for reason in right_contract["reasons"]
+        ]
         if left_contract["task_ids"] != right_contract["task_ids"]:
             reasons.append("task_id_set_mismatch")
         left_protocol = left_contract["protocol_fingerprint"]
@@ -555,9 +552,7 @@ def three_arm_comparison(
         "N_minus_Base": _delta("N", "Base"),
         "RL_minus_N": _delta("RL", "N"),
         "RL_minus_Base": _delta("RL", "Base"),
-        "pair_status": {
-            key: value["status"] for key, value in pair_contracts.items()
-        },
+        "pair_status": {key: value["status"] for key, value in pair_contracts.items()},
         "arm_contracts": contracts,
         "pairs": pairs,
     }

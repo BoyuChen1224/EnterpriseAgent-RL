@@ -197,6 +197,7 @@ class OnlineRollout:
             episode = existing_episodes.get(episode_id)
             if episode is None:
                 try:
+
                     def invoke_engine(
                         task=task,
                         round_index=round_index,
@@ -215,9 +216,7 @@ class OnlineRollout:
                             episode_id=episode_id,
                         )
 
-                    episode = self.guard.run_callable(
-                        invoke_engine, phase=f"generate:{episode_id}"
-                    )
+                    episode = self.guard.run_callable(invoke_engine, phase=f"generate:{episode_id}")
                     if episode.episode_id != episode_id:
                         raise ValueError("engine_episode_id_mismatch")
                     if episode.policy_snapshot_id != policy_snapshot.get("policy_snapshot_id"):

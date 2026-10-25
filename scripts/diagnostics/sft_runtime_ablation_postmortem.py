@@ -127,7 +127,11 @@ def _task_record(root: Path, group: str, result_path: Path) -> dict[str, Any]:
     has_sql_error = bool(sql_errors)
 
     failure_stages: list[str] = []
-    if not steps or terminal_reason in {"invalid_json", "invalid_action", "invalid_action_arguments"}:
+    if not steps or terminal_reason in {
+        "invalid_json",
+        "invalid_action",
+        "invalid_action_arguments",
+    }:
         failure_stages.append("parser_or_action_validation")
     if has_sql_error:
         failure_stages.append("sql_execution_error")
@@ -140,7 +144,11 @@ def _task_record(root: Path, group: str, result_path: Path) -> dict[str, Any]:
     if result["budget_exhausted"]:
         failure_stages.append("budget_exhaustion")
 
-    if not steps or terminal_reason in {"invalid_json", "invalid_action", "invalid_action_arguments"}:
+    if not steps or terminal_reason in {
+        "invalid_json",
+        "invalid_action",
+        "invalid_action_arguments",
+    }:
         primary_failure_stage = "parser_or_action_validation"
     elif has_sql_success and (has_sql_error or terminal_reason != "completed"):
         primary_failure_stage = "sql_success_not_completed"
@@ -228,8 +236,7 @@ def load_records(root: Path) -> dict[str, dict[str, dict[str, Any]]]:
         if len(result_paths) != 20:
             raise ValueError(f"{group}: expected 20 result files, found {len(result_paths)}")
         group_records = {
-            (record := _task_record(root, group, path))["task_id"]: record
-            for path in result_paths
+            (record := _task_record(root, group, path))["task_id"]: record for path in result_paths
         }
         if len(group_records) != 20:
             raise ValueError(f"{group}: duplicate task ids")
@@ -293,7 +300,9 @@ def aggregate_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         "finish_task_count": sum(record["finish_present"] for record in records),
         "finish_rate": _ratio(sum(record["finish_present"] for record in records), count),
         "budget_exhausted_task_count": sum(record["budget_exhausted"] for record in records),
-        "budget_exhaustion_rate": _ratio(sum(record["budget_exhausted"] for record in records), count),
+        "budget_exhaustion_rate": _ratio(
+            sum(record["budget_exhausted"] for record in records), count
+        ),
         "average_tool_calls": average("tool_calls"),
         "average_latency_s": average("latency_s"),
         "average_input_tokens": average("input_tokens"),
@@ -429,7 +438,9 @@ def build_common_patterns(records: dict[str, dict[str, dict[str, Any]]]) -> list
             "classification": "confirmed_common_failure",
             "task_ids": intersection(
                 lambda record: bool(record["reported_recovery_next_actions"])
-                and all(action in {"sql", None} for action in record["reported_recovery_next_actions"])
+                and all(
+                    action in {"sql", None} for action in record["reported_recovery_next_actions"]
+                )
             ),
             "evidence": "For these tasks, every group either emits another SQL Action after the error or has no next Action.",
         },
@@ -610,11 +621,17 @@ def build_postmortem(root: Path) -> dict[str, Any]:
             "executable_sql_tasks": sorted(e_executable_tasks),
             "actual_sql_recovery_tasks": sorted(e_sql_recovery_tasks),
             "actual_sql_recovery_task_count": len(e_sql_recovery_tasks),
-            "check_action_task_count": sum(record["check_present"] for record in e_records.values()),
+            "check_action_task_count": sum(
+                record["check_present"] for record in e_records.values()
+            ),
             "check_action_error_count": e_check_error_count,
-            "finish_action_task_count": sum(record["finish_present"] for record in e_records.values()),
+            "finish_action_task_count": sum(
+                record["finish_present"] for record in e_records.values()
+            ),
             "finish_action_error_count": e_finish_error_count,
-            "terminal_reason_counts": dict(Counter(record["terminal_reason"] for record in e_records.values())),
+            "terminal_reason_counts": dict(
+                Counter(record["terminal_reason"] for record in e_records.values())
+            ),
             "conclusion": "E's successful SQL Actions are the two top-task probe queries; no task executes a successful SQL after an error, and lower calls do not establish improved completion.",
         },
         "common_failure_patterns": build_common_patterns(records),
@@ -663,7 +680,12 @@ def _fmt_percent(value: float) -> str:
 
 def _task_cell(record: dict[str, Any]) -> str:
     pre = ",".join(record["pre_sql_schema_dictionary"]) or "-"
-    next_actions = ",".join(sorted(set(action for action in record["reported_recovery_next_actions"] if action))) or "-"
+    next_actions = (
+        ",".join(
+            sorted(set(action for action in record["reported_recovery_next_actions"] if action))
+        )
+        or "-"
+    )
     return (
         f"stage={record['primary_failure_stage']}; first={record['first_action'] or '-'}; "
         f"pre={pre}; sql={record['sql_attempts']}/{record['executable_sql_count']}/{record['sql_error_count']}; "
@@ -739,9 +761,7 @@ def render_markdown(postmortem: dict[str, Any]) -> str:
 |---|---|---|---|---|---|---|---|""",
     ]
     for task in postmortem["paired_tasks"]:
-        cells = [
-            _task_cell(task["groups"][group]).replace("|", "\\|") for group in GROUPS
-        ]
+        cells = [_task_cell(task["groups"][group]).replace("|", "\\|") for group in GROUPS]
         lines.append(
             f"| {task['task_id']} | {task['template_id']} | {task['teacher_provenance']} | "
             + " | ".join(cells)
@@ -772,7 +792,9 @@ def render_markdown(postmortem: dict[str, Any]) -> str:
     ]
     for pattern in postmortem["common_failure_patterns"]:
         if pattern["classification"] == "confirmed_common_failure":
-            lines.append(f"- `{pattern['id']}`（{len(pattern['task_ids'])} tasks）：{pattern['evidence']} IDs: {', '.join(pattern['task_ids'])}。")
+            lines.append(
+                f"- `{pattern['id']}`（{len(pattern['task_ids'])} tasks）：{pattern['evidence']} IDs: {', '.join(pattern['task_ids'])}。"
+            )
     lines += [
         "",
         "### Group-specific failure",
@@ -814,7 +836,15 @@ def main() -> None:
     args.json_output.write_text(json.dumps(postmortem, ensure_ascii=False, indent=2) + "\n")
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(render_markdown(postmortem))
-    print(json.dumps({"status": postmortem["status"], "report": str(args.report), "json": str(args.json_output)}))
+    print(
+        json.dumps(
+            {
+                "status": postmortem["status"],
+                "report": str(args.report),
+                "json": str(args.json_output),
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

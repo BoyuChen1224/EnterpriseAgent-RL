@@ -316,13 +316,11 @@ def main() -> int:
         "reload": reload_check,
     }
     _write(run / "preflight.json", preflight)
-    tool_summary = (
-        f"{base_metrics.get('tool_calls')}/{base_metrics.get('tool_errors')}"
-    )
+    tool_summary = f"{base_metrics.get('tool_calls')}/{base_metrics.get('tool_errors')}"
 
     report = f"""# T-031 / E-028 — Qwen3-8B Base and LoRA pilot
 
-Status: **{checks['status']}**
+Status: **{checks["status"]}**
 
 This run uses `Qwen/Qwen3-8B` at revision `b968826d9c46dd6066d109eabc6255188de91218`,
 raw safetensors, FP16, SDPA math, and hard `enable_thinking=false`. The Base stage
@@ -331,29 +329,29 @@ Qwen2.5 validation result.
 
 ## Base panel
 
-{_case_table(base_metrics, run / 'base' / 'case-results.jsonl')}
+{_case_table(base_metrics, run / "base" / "case-results.jsonl")}
 
-Counts: `{json.dumps(base_metrics.get('counts', {}), ensure_ascii=False)}`
-Evidence association check: `{checks.get('evidence_association_check', 'not-run')}`
-Business success rate (planned denominator): `{base_metrics.get('business_success_rate')}`  
-SQL executable rate: `{base_metrics.get('sql_executable_rate')}`  
-Engine events: `{base_metrics.get('engine_events')}`; tool calls/errors: `{tool_summary}`  
-Status: `{base_metrics.get('status')}`. Business failures remain scored; only explicit
+Counts: `{json.dumps(base_metrics.get("counts", {}), ensure_ascii=False)}`
+Evidence association check: `{checks.get("evidence_association_check", "not-run")}`
+Business success rate (planned denominator): `{base_metrics.get("business_success_rate")}`\x20\x20
+SQL executable rate: `{base_metrics.get("sql_executable_rate")}`\x20\x20
+Engine events: `{base_metrics.get("engine_events")}`; tool calls/errors: `{tool_summary}`\x20\x20
+Status: `{base_metrics.get("status")}`. Business failures remain scored; only explicit
 infrastructure/evidence failures are unknown.
 
 ## LoRA smoke
 
-Selected `{lora_metrics.get('sample_count')}` re-tokenized train decision examples;
-processed `{lora_metrics.get('microbatches_processed')}` microbatches with
-`{lora_metrics.get('successful_optimizer_updates')}` successful optimizer updates.
-Target modules: `{lora_metrics.get('module_count')}` (expected 252); base changed:
-`{lora_metrics.get('base_parameters_changed')}`; LoRA changed tensors:
-`{lora_metrics.get('lora_changed_parameter_count')}`; reload: `{reload_check.get('status')}`.
+Selected `{lora_metrics.get("sample_count")}` re-tokenized train decision examples;
+processed `{lora_metrics.get("microbatches_processed")}` microbatches with
+`{lora_metrics.get("successful_optimizer_updates")}` successful optimizer updates.
+Target modules: `{lora_metrics.get("module_count")}` (expected 252); base changed:
+`{lora_metrics.get("base_parameters_changed")}`; LoRA changed tensors:
+`{lora_metrics.get("lora_changed_parameter_count")}`; reload: `{reload_check.get("status")}`.
 
 ## Resource and evidence handoff
 
-GPU allocation: `{allocation.get('total_gpu_minutes')}` minutes, within 240-minute cap:
-`{allocation.get('within_budget')}`. Job chain is in `job-chain.json`; exact command
+GPU allocation: `{allocation.get("total_gpu_minutes")}` minutes, within 240-minute cap:
+`{allocation.get("within_budget")}`. Job chain is in `job-chain.json`; exact command
 statuses are in `commands.json`. All request/response/engine events, SQL audits,
 trajectories and verifier summaries remain under `base/`. Adapter, optimizer/scaler/RNG
 checkpoint and reload evidence remain under `lora/`.

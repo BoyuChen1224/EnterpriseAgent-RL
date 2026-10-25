@@ -235,21 +235,14 @@ def run_online_training(
                     guard=guard,
                     policy_snapshot=final_snapshot,
                     arm_metadata=arm_metadata,
-                    evaluation_seed=int(
-                        config.evaluation.get("generation", {}).get("seed", 17)
-                    ),
+                    evaluation_seed=int(config.evaluation.get("generation", {}).get("seed", 17)),
                 )
                 if arm_policy is not None and hasattr(arm_policy, "close"):
-                    guard.run_callable(
-                        arm_policy.close, phase=f"evaluation:{arm}:cleanup"
-                    )
+                    guard.run_callable(arm_policy.close, phase=f"evaluation:{arm}:cleanup")
                 arm_results[arm] = evaluations[arm]
                 evaluation_aggregates[arm] = aggregate_source(
                     source_root=context.run_dir,
-                    verifier_index=context.run_dir
-                    / "evaluation"
-                    / arm
-                    / "verifier-results.jsonl",
+                    verifier_index=context.run_dir / "evaluation" / arm / "verifier-results.jsonl",
                     identity_field="task_id",
                     expected_count=len(evaluation_tasks[arm]),
                     source_kind=f"T023-E025-real-validation-{arm}",
@@ -261,9 +254,12 @@ def run_online_training(
             )
             atomic_write_json(context.run_dir / "comparison.json", comparison)
             atomic_write_json(context.run_dir / "metrics.json", evaluation_aggregates)
-        status = "COMPLETED" if not run_evaluation or all(
-            value.get("status") == "COMPLETED" for value in evaluations.values()
-        ) else "INCOMPLETE_EVALUATION"
+        status = (
+            "COMPLETED"
+            if not run_evaluation
+            or all(value.get("status") == "COMPLETED" for value in evaluations.values())
+            else "INCOMPLETE_EVALUATION"
+        )
         budget_snapshot = budget_info("run-complete")
         result = {
             "schema_version": "grpo-online-run-v1",
@@ -426,9 +422,7 @@ def run_frozen_evaluation(
                     guard=guard,
                     policy_snapshot=base_snapshot,
                     arm_metadata=metadata,
-                    evaluation_seed=int(
-                        config.evaluation.get("generation", {}).get("seed", 17)
-                    ),
+                    evaluation_seed=int(config.evaluation.get("generation", {}).get("seed", 17)),
                     require_qualified_evidence=True,
                 )
             except BudgetError:
@@ -467,17 +461,12 @@ def run_frozen_evaluation(
             finally:
                 if active_policy is not None and hasattr(active_policy, "close"):
                     try:
-                        guard.run_callable(
-                            active_policy.close, phase=f"evaluation:{arm}:cleanup"
-                        )
+                        guard.run_callable(active_policy.close, phase=f"evaluation:{arm}:cleanup")
                     finally:
                         active_policy = None
             aggregates[arm] = aggregate_source(
                 source_root=context.run_dir,
-                verifier_index=context.run_dir
-                / "evaluation"
-                / arm
-                / "verifier-results.jsonl",
+                verifier_index=context.run_dir / "evaluation" / arm / "verifier-results.jsonl",
                 identity_field="task_id",
                 expected_count=len(evaluation_tasks),
                 source_kind=f"T024-E026-real-validation-{arm}",
@@ -542,9 +531,7 @@ def run_frozen_evaluation(
                 pass
         try:
             guard.close_job(
-                status=(
-                    "BUDGET_STOP" if budget_stopped else final_status
-                ),
+                status=("BUDGET_STOP" if budget_stopped else final_status),
                 reason=failure.get("message") if failure else None,
             )
         except Exception:

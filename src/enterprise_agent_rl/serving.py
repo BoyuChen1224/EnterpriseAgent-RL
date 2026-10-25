@@ -134,9 +134,7 @@ def create_app(
         descriptors = {
             version: {
                 "version": version,
-                "kind": "deterministic_fixture"
-                if version.startswith("fixture-")
-                else "local_llm",
+                "kind": "deterministic_fixture" if version.startswith("fixture-") else "local_llm",
             }
             for version in factories
         }

@@ -653,9 +653,7 @@ def _environment_preflight(paths: dict[str, Path], config: Any) -> dict[str, Any
     }
 
 
-def _cpu_tokenizer_preflight(
-    paths: dict[str, Path], context: Any, config: Any
-) -> dict[str, Any]:
+def _cpu_tokenizer_preflight(paths: dict[str, Path], context: Any, config: Any) -> dict[str, Any]:
     """Check the cached tokenizer without loading any Qwen3 model weights."""
 
     from transformers import AutoTokenizer
@@ -869,9 +867,7 @@ def _prepare(paths: dict[str, Path]) -> dict[str, Any]:
             },
         )
     existing_allocation = read_json(paths["run"] / "allocation-ledger.json", {}) or {}
-    if not isinstance(existing_allocation, dict) or not existing_allocation.get(
-        "slurm_root_rows"
-    ):
+    if not isinstance(existing_allocation, dict) or not existing_allocation.get("slurm_root_rows"):
         _write_json(
             paths["run"] / "allocation-ledger.json",
             {

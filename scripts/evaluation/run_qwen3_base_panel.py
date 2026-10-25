@@ -234,9 +234,7 @@ def _explicit_infrastructure_errors(trajectory) -> list[str]:
                 errors.append(code or message[:200])
     for item in trajectory.runtime_errors:
         text = f"{item.get('type', '')} {item.get('message', '')}".lower()
-        if any(token in text for token in INFRA_TEXT) or any(
-            code in text for code in INFRA_CODES
-        ):
+        if any(token in text for token in INFRA_TEXT) or any(code in text for code in INFRA_CODES):
             errors.append(text[:200])
     return sorted(set(errors))
 
@@ -253,9 +251,7 @@ def _business_category(trajectory, reward) -> str:
         for attempt in trajectory.model_attempts
     ):
         return "Invalid Action"
-    if any(
-        step.tool_name == "sql" and not step.tool_result.ok for step in trajectory.steps
-    ):
+    if any(step.tool_name == "sql" and not step.tool_result.ok for step in trajectory.steps):
         return "SQL Error or Recovery Failure"
     if trajectory.terminal_reason == "completed":
         return "Wrong Final Answer"
@@ -334,9 +330,7 @@ def run_worker(
         model_config.generation,
     )
     selected = [
-        item
-        for index, item in enumerate(manifest["tasks"])
-        if index % worker_count == worker_index
+        item for index, item in enumerate(manifest["tasks"]) if index % worker_count == worker_index
     ]
     for item in selected:
         task_id = item["task_id"]
@@ -467,15 +461,11 @@ def merge_workers(output: Path) -> int:
         if record["scored"] and record.get("trajectory_path"):
             trajectories.append(TrajectoryStore.load(Path(record["trajectory_path"])))
     aggregate = (
-        summarize(trajectories, settings, allow_multiple_databases=True)
-        if trajectories
-        else None
+        summarize(trajectories, settings, allow_multiple_databases=True) if trajectories else None
     )
     all_steps = [step for trajectory in trajectories for step in trajectory.steps]
     sql_steps = [step for step in all_steps if step.tool_name == "sql"]
-    sql_fingerprints = [
-        _sha(step.action.model_dump()) for step in sql_steps if step.tool_result.ok
-    ]
+    sql_fingerprints = [_sha(step.action.model_dump()) for step in sql_steps if step.tool_result.ok]
     event_ids = []
     peak_allocated = []
     peak_reserved = []
@@ -513,11 +503,7 @@ def merge_workers(output: Path) -> int:
         if counts["scored"]
         else None,
         "unknown_reasons": sorted(
-            {
-                reason
-                for record in ordered
-                for reason in record.get("unknown_reasons", [])
-            }
+            {reason for record in ordered for reason in record.get("unknown_reasons", [])}
         ),
         "sql_executable_rate": sum(step.tool_result.ok for step in sql_steps) / len(sql_steps)
         if sql_steps
@@ -528,11 +514,7 @@ def merge_workers(output: Path) -> int:
         "tool_errors": sum(not step.tool_result.ok for step in all_steps),
         "repeated_sql": len(sql_fingerprints) - len(set(sql_fingerprints)),
         "behavior_counts": dict(
-            Counter(
-                step.action.kind
-                for trajectory in trajectories
-                for step in trajectory.steps
-            )
+            Counter(step.action.kind for trajectory in trajectories for step in trajectory.steps)
         ),
         "engine_events": len(set(event_ids)),
         "engine_event_ids_unique": len(event_ids) == len(set(event_ids)),

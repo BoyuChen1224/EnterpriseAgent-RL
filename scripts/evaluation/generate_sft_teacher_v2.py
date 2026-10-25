@@ -281,17 +281,13 @@ def generate(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=Path("benchmarks/m2a/manifest.json"))
-    parser.add_argument(
-        "--database-root", type=Path, default=Path("artifacts/m2a-databases-final")
-    )
+    parser.add_argument("--database-root", type=Path, default=Path("artifacts/m2a-databases-final"))
     parser.add_argument(
         "--existing-trajectories",
         type=Path,
         default=Path("artifacts/m2b-train-audit/trajectories"),
     )
-    parser.add_argument(
-        "--output", type=Path, default=Path("artifacts/sft-data-train-teacher-v2")
-    )
+    parser.add_argument("--output", type=Path, default=Path("artifacts/sft-data-train-teacher-v2"))
     args = parser.parse_args()
     result = generate(
         args.manifest,

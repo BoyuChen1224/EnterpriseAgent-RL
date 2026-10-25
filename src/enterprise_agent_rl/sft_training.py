@@ -433,9 +433,7 @@ def select_decision_examples(
         if len(selected) == max_samples:
             break
     if len(selected) != max_samples:
-        raise SFTDataError(
-            f"decision_bounded_examples_insufficient:{len(selected)}:{max_samples}"
-        )
+        raise SFTDataError(f"decision_bounded_examples_insufficient:{len(selected)}:{max_samples}")
     return selected, formatted
 
 

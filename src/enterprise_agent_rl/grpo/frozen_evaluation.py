@@ -254,9 +254,7 @@ def evaluate_frozen(
             "raw_saved": True,
             "verifier_called": True,
             "trajectory_path": trajectory_path,
-            "trajectory_sha256": qualification.get("trajectory_sha256")
-            if qualification
-            else None,
+            "trajectory_sha256": qualification.get("trajectory_sha256") if qualification else None,
             "qualification": qualification,
         }
         append_jsonl(results_path, row)

@@ -37,17 +37,19 @@ def main() -> int:
     args = parser.parse_args()
 
     path = args.run / "job-chain.json"
-    chain = json.loads(path.read_text()) if path.is_file() else {
-        "schema_version": "1.0",
-        "experiment": "T-031/E-028",
-        "run": str(args.run.resolve()),
-        "run_commit": _git("rev-parse", "HEAD"),
-        "run_dirty_at_record": bool(_git("status", "--porcelain")),
-        "records": [],
-    }
-    record = next(
-        (item for item in chain["records"] if item.get("job_id") == args.job_id), None
+    chain = (
+        json.loads(path.read_text())
+        if path.is_file()
+        else {
+            "schema_version": "1.0",
+            "experiment": "T-031/E-028",
+            "run": str(args.run.resolve()),
+            "run_commit": _git("rev-parse", "HEAD"),
+            "run_dirty_at_record": bool(_git("status", "--porcelain")),
+            "records": [],
+        }
     )
+    record = next((item for item in chain["records"] if item.get("job_id") == args.job_id), None)
     if record is None:
         record = {
             "stage": args.stage,

@@ -497,8 +497,7 @@ def create_model_app(engine) -> FastAPI:
         return {
             "models": [
                 {
-                    "model": metadata.get("model_id")
-                    or metadata.get("model", {}).get("model_id"),
+                    "model": metadata.get("model_id") or metadata.get("model", {}).get("model_id"),
                     "model_version": metadata.get("model_version"),
                     "profile_id": metadata.get("profile_id"),
                     "revision": metadata.get("model_revision")

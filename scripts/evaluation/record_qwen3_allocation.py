@@ -20,11 +20,15 @@ def main() -> int:
     parser.add_argument("--gpu-count", type=int, required=True)
     args = parser.parse_args()
     path = args.run / "allocation-ledger.json"
-    existing = json.loads(path.read_text()) if path.is_file() else {
-        "schema_version": "1.0",
-        "experiment": "T-031/E-028",
-        "records": [],
-    }
+    existing = (
+        json.loads(path.read_text())
+        if path.is_file()
+        else {
+            "schema_version": "1.0",
+            "experiment": "T-031/E-028",
+            "records": [],
+        }
+    )
     record = {
         "stage": args.stage,
         "status": args.status,

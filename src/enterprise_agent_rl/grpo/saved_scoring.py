@@ -187,11 +187,9 @@ def _target_private_task(private_plan: Path, task_id: str) -> tuple[BenchmarkTas
             raise SavedScoringError("private_task_plan_record_invalid")
         task_value = record.get("task") if isinstance(record.get("task"), dict) else record
         public = task_value.get("public") if isinstance(task_value, dict) else None
-        record_task_id = (
-            task_value.get("task_id")
-            if isinstance(task_value, dict)
-            else None
-        ) or (public.get("task_id") if isinstance(public, dict) else None)
+        record_task_id = (task_value.get("task_id") if isinstance(task_value, dict) else None) or (
+            public.get("task_id") if isinstance(public, dict) else None
+        )
         if record_task_id == task_id:
             if selected is not None:
                 raise SavedScoringError(f"private_task_duplicate:{task_id}")
@@ -485,9 +483,7 @@ def validate_saved_target(
         "source_budget_state": budget_state,
         "source_model_calls": source_model_calls,
         "historical_verifier_calls": int(
-            budget_state.get("call_counters", {}).get(
-                "verifier_calls", HISTORICAL_VERIFIER_CALLS
-            )
+            budget_state.get("call_counters", {}).get("verifier_calls", HISTORICAL_VERIFIER_CALLS)
         ),
         "historical_verifier_sql": int(
             budget_state.get("call_counters", {}).get("verifier_sql", HISTORICAL_VERIFIER_SQL)
@@ -544,14 +540,10 @@ class _CapturedSQL:
                     result = {"ok": False, "error": "query_worker_resource_limit_or_failure"}
             except subprocess.TimeoutExpired as exc:
                 stdout = (
-                    exc.stdout.decode()
-                    if isinstance(exc.stdout, bytes)
-                    else (exc.stdout or "")
+                    exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
                 )
                 stderr = (
-                    exc.stderr.decode()
-                    if isinstance(exc.stderr, bytes)
-                    else (exc.stderr or "")
+                    exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
                 )
                 result = {"ok": False, "error": "query_timeout"}
             except (ValueError, OSError):
@@ -584,9 +576,7 @@ class _CapturedSQL:
 def _trajectory_runtime_counts(trajectory: Trajectory) -> dict[str, Any]:
     sql_steps = [step for step in trajectory.steps if step.tool_name == "sql"]
     non_sql_steps = [
-        step
-        for step in trajectory.steps
-        if step.tool_name in {"schema", "dictionary", "check"}
+        step for step in trajectory.steps if step.tool_name in {"schema", "dictionary", "check"}
     ]
 
     def is_budget_error(step: Any) -> bool:

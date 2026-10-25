@@ -275,13 +275,17 @@ def _read_panel(path: Path, task_id: str) -> dict[str, Any]:
             "evaluation_status": "technical_unknown",
             "terminal_reason": "panel_unreadable",
         }
-    return value if isinstance(value, dict) else {
-        "task_id": task_id,
-        "status": "unknown",
-        "qualification": "technical_unknown",
-        "evaluation_status": "technical_unknown",
-        "terminal_reason": "panel_invalid",
-    }
+    return (
+        value
+        if isinstance(value, dict)
+        else {
+            "task_id": task_id,
+            "status": "unknown",
+            "qualification": "technical_unknown",
+            "evaluation_status": "technical_unknown",
+            "terminal_reason": "panel_invalid",
+        }
+    )
 
 
 def _read_jsonl_records(path: Path) -> tuple[list[dict[str, Any]] | None, str | None]:
@@ -606,9 +610,7 @@ def run_smoke(
                 "database_sha256": trajectory.get("database_sha256") if trajectory else None,
                 "model_attempts": len(trajectory.get("model_attempts", [])) if trajectory else None,
                 "tool_calls": sum(
-                    1
-                    for step in (trajectory or {}).get("steps", [])
-                    if step.get("tool_name")
+                    1 for step in (trajectory or {}).get("steps", []) if step.get("tool_name")
                 ),
                 "prompt_tokens": sum(
                     step.get("prompt_tokens", 0) for step in (trajectory or {}).get("steps", [])
@@ -797,8 +799,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cleanup-reserve", type=float, default=60)
     parser.add_argument("--cleanup-grace", type=float, default=15)
     return parser.parse_args()
-
-
 
 
 def _bounded_main() -> int:
@@ -1170,8 +1170,7 @@ def _bounded_main() -> int:
                         "gpu_allocation": {
                             "allocation_seconds": None,
                             "allocation_source": (
-                                "allocation-ledger.slurm_allocation."
-                                "observed_allocation_seconds"
+                                "allocation-ledger.slurm_allocation.observed_allocation_seconds"
                             ),
                             "allocation_reason": (
                                 "scheduler allocation is not queried by the launcher"

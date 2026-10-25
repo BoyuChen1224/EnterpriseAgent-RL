@@ -247,9 +247,7 @@ class EvidenceStore:
         request_sha = sha256_file(request_path)
         content_sha = sha256_text(content)
         record.metadata.update(
-            self._common_metadata(
-                handle, request_sha256=request_sha, content_sha256=content_sha
-            )
+            self._common_metadata(handle, request_sha256=request_sha, content_sha256=content_sha)
         )
         token_payload = record.to_dict()
         token_hash = canonical_hash(token_payload)

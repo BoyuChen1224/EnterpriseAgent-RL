@@ -16,10 +16,7 @@ class ImmutableWriteError(RuntimeError):
 
 
 def _json_bytes(value: Any) -> bytes:
-    return (
-        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
-        + b"\n"
-    )
+    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
 
 
 def atomic_write_json(path: Path, value: Any) -> None:

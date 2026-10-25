@@ -116,9 +116,7 @@ class BudgetGuard:
         self.soft_seconds = int(soft_seconds)
         self.cleanup_reserve_seconds = int(cleanup_reserve_seconds)
         self.gpu_count = int(gpu_count)
-        self.call_limits = {
-            str(key): int(value) for key, value in (call_limits or {}).items()
-        }
+        self.call_limits = {str(key): int(value) for key, value in (call_limits or {}).items()}
         if any(value < 1 for value in self.call_limits.values()):
             raise ValueError("call_limits_must_be_positive")
         self.clock = clock or SystemClock()

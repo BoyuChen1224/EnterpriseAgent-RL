@@ -115,8 +115,10 @@ def recursive_equal(left: Any, right: Any) -> bool:
         return set(left) == set(right) and all(
             recursive_equal(left[key], right[key]) for key in left
         )
-    if isinstance(left, Sequence) and isinstance(right, Sequence) and not isinstance(
-        left, str | bytes | bytearray
+    if (
+        isinstance(left, Sequence)
+        and isinstance(right, Sequence)
+        and not isinstance(left, str | bytes | bytearray)
     ):
         return len(left) == len(right) and all(
             recursive_equal(a, b) for a, b in zip(left, right, strict=False)
