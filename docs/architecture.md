@@ -42,6 +42,9 @@ flowchart LR
 | grpo/ | formal rollout、TokenRecord、EvidenceStore、预算、LoRA 更新、冻结 Base/N/RL 评测和聚合 |
 | scripts/training/run_sft.py | train-only 手工 LoRA SFT pilot 入口；需要 Slurm，不能据脚本名推断 current N 已可 fresh 重训 |
 | scripts/training/run_grpo.py | formal GRPO wrapper；显式 repo/config/run，分出 CPU fake/tiny、real train、eval-only、offline closeout |
+| qwen3_sft.py / scripts/training/run_qwen3_sft.py | Qwen3 固定 54 条 Runtime 决策监督、assistant-only mask、27 次 LoRA 更新与独立重载 |
+| grpo/qwen3_rollout.py / grpo/qwen3_update.py | Qwen3 原生 token/logprob/mask 契约、冻结 rollout 批次与父依赖 GRPO delta |
+| scripts/training/run_qwen3_grpo_pilot.py | Qwen3 固定批次两更新、独立重载和 fresh SFT/RL 冻结比较；没有在线采样阶段 |
 | scripts/serving/run_sft_n_api.py | 模型子进程 + Agent API 子进程的 bounded smoke/serve supervisor |
 
 当前实现是有界 Python 状态循环和显式文件证据，不是隐式工作流服务。
@@ -102,11 +105,13 @@ SFT 监督输入只允许来自获准 train split 的实际执行 assistant Acti
 
 scripts/training/run_sft.py 是当前仓库中的受控单卡手工 LoRA pilot：读取 dataset JSONL 与 metadata，要求 SLURM_JOB_ID，使用固定 Qwen revision、FP16、SDPA 和 manual LoRA，并写 checkpoint/optimizer/scheduler/scaler/RNG。它不是一个隐藏下载、自动准备数据库、自动生成 current N 的全量复训器。
 
-当前冻结 N 的 lineage 是 T-017-R2 的 final-step-27 adapter；已记录 weight SHA-256 为 e67372df6d805d4ece08e6e698ccbe76d73cc8f83fe96b12f6c7939028f088b9，adapter config SHA-256 为 bae7f0af3379a71ae24b0386131d1728eea4ed48fef8c7a0f3ba22780ce17c22。历史训练日志和源码快照保留在对应的本地 artifacts 目录；当前源码提交不包含这些过程记录。
+当前 Qwen3 SFT 入口为 `scripts/training/run_qwen3_sft.py`，配置为 `configs/training/qwen3-runtime-sft.toml`。54 条 train 决策经当前 tokenizer 重渲染，2 epochs、108 microbatch、27 次成功更新；LoRA 覆盖 36 层 × 7 targets = 252 modules。Base 冻结，FP16 AMP 与 SDPA math 覆盖 forward、backward 和 checkpoint recompute。冻结 parent 权重 SHA-256 为 `413d1b0211ba93b2df322dcdaeb1fa1c3f019210c8ded510a2920e5ad6e114e9`。
+
+历史 1.5B N 的 lineage 是 T-017-R2 的 final-step-27 adapter；weight SHA-256 为 e67372df6d805d4ece08e6e698ccbe76d73cc8f83fe96b12f6c7939028f088b9，adapter config SHA-256 为 bae7f0af3379a71ae24b0386131d1728eea4ed48fef8c7a0f3ba22780ce17c22。历史训练日志和源码快照保留在对应的本地 artifacts 目录；源码提交不包含这些过程记录。
 
 ## GRPO：多轮 rollout、token loss 与更新
 
-formal GRPO 的 train 路径由 run_grpo.py train 调用 grpo.orchestration.run_online_training：
+历史 1.5B formal GRPO 的在线 train 路径由 run_grpo.py train 调用 grpo.orchestration.run_online_training：
 
 1. 按 task/group 采样多条真实多轮 episode，并保存每个模型 request 的 messages、response、token IDs 和模型身份。
 2. TokenRecord 保存 prompt/generated IDs、response-only mask、raw policy log-probabilities 和 behavior sampling log-probabilities。tool token 不被 mask 成 response loss。
@@ -115,6 +120,8 @@ formal GRPO 的 train 路径由 run_grpo.py train 调用 grpo.orchestration.run_
 5. 保存 rollout fingerprint、score/index、training state、parent stack 和 final delta；资源/证据缺失时终点为 unknown 或 null。
 
 这里的上游算法是仓库内的 LocalGRPOAdapter 与本地 torch backend 适配，不是安装完整 TRL Trainer，也不是 vLLM、PEFT、Accelerate、分布式队列或外部训练服务。
+
+Qwen3 使用独立的 `run_qwen3_grpo_rollout.py` 采集 4 task × 4 episode，再由 `run_qwen3_grpo_pilot.py` 复用固定批次进行两次更新。118 条模型请求中，70 条有非零优势、48 条为零；优势按 episode 的组内相对 reward 绑定到请求。loss 只包含模型生成 token，完整分母为 4745 token，零优势记录保留在分母中。两次更新共 140 次 backward；该 pilot 没有使用更新后策略重新采样，不等于历史在线入口的两轮训练。
 
 ## Base、N、RL 的加载身份
 
@@ -126,9 +133,13 @@ formal GRPO 的 train 路径由 run_grpo.py train 调用 grpo.orchestration.run_
 | N | Qwen base 一次 | parent N 一次 | SFT N |
 | RL | Qwen base 一次 | parent N 一次，再 fixed final delta 一次 | N 的 GRPO delta；不是独立 Base→RL 替代模型 |
 
-当前固定身份为 Qwen/Qwen2.5-1.5B-Instruct revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306，V100 路径为 FP16 + sdpa_math。T-023/E-025 的 final-delta 由冻结评测 TOML 以 hash 绑定；fresh checkout 没有该 parent/delta 时不能声称可加载 RL。
+当前主线身份为 `Qwen/Qwen3-8B` revision `b968826d9c46dd6066d109eabc6255188de91218`，V100 路径为 FP16 + SDPA math、thinking-off。Qwen3 GRPO delta SHA-256 为 `dc46efecbd519142ccca44fa3291861177f299bf0e599cced65094fea9e1260a`，必须在指定 parent SFT merge 后加载，不能作为独立 Adapter 套在原始 Base 上。
+
+历史 Qwen2.5-1.5B-Instruct revision 为 989aa7980e4cf806f80c7fef2b1adb7bc71aa306，T-023/E-025 的 final-delta 由历史冻结评测 TOML 绑定。两条模型链使用各自的 cache、Adapter、配置与环境，不混用。
 
 ## 评测与 unknown 口径
+
+Qwen3 固定 20 项 validation panel 上，两组配对评测分别为 Base/SFT 0/20 对 13/20，以及 fresh SFT/RL 13/20 对 13/20；每臂均 20/20 scored、unknown=0。两次更新未改变任何任务的成功/失败。它们是单 seed、小规模共享模板结果，不能推断跨库泛化；test 未运行。
 
 E-026 的三臂评测固定 20 项 validation panel、greedy temperature 0、seed 17、相同 Runtime/Verifier 边界。每个 arm 单独要求 planned=qualified=scored=20、unknown=0；业务失败是已评分的 false，不是 unknown。
 
@@ -146,3 +157,5 @@ pair gate 独立计算：
 Agent API 是单进程 loopback FastAPI，状态和轨迹持久化到 run-local SQLite/JSON；模型服务是单卡 Transformers HTTP 端点。SFT N launcher 负责启动、ready、smoke/serve、deadline、signal 和子进程组收尾，持久化 model event、trajectory、SQL audit、summary/checks 与 allocation/wall 分离。
 
 当前没有 LangGraph、vLLM、完整 TRL Trainer、PostgreSQL 后端、外部分布式队列、认证、多租户、常驻公网部署或跨 Job 自动资源累计。E-027 只证明单 V100 上固定 N 的两项 train HTTP smoke；T-028 的新增 smoke/serve/lifecycle 证明是 CPU 合同，不是新的 V100 或生产部署证明。
+
+Qwen3 已通过真实 HTTP 模型服务连接 LocalModelPolicy/Runtime 的评测，但 `configs/serving/sft-n.toml` 仍是历史 1.5B profile。当前架构支持的真实加载链与已验证的具体服务 profile 分开记录，详见 [Qwen3 后训练指南](qwen3-post-training.md)。
