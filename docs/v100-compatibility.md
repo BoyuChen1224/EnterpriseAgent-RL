@@ -1,47 +1,32 @@
-# Milestone 2A：V100 兼容性与证据
+# V100 运行说明
 
-检查日期：2026-10-15（Asia/Shanghai）。起点 `dev/cpu-agent-mvp@cde59eb`；开发分支 `dev/qwen-base-inference`。
+项目在 V100/V100S 32GB、compute capability 7.0 上运行 Qwen2.5-1.5B-Instruct 和 Qwen3-8B。使用 FP16 权重和 SDPA math。
 
-**GPU 验收 Pending。用户尚未授权收费 GPU 作业，本阶段没有提交 gpu2Q 作业，没有加载 Qwen，没有真实模型推理或训练结果。** 下表中的 Pending 不能视为通过。
+## 固定组合
 
-M2B 更新（2026-10-16）：固定 revision 的完整 snapshot 已在非 GPU 环境续传完成，并通过逐文件 SHA-256 校验；缓存证据见 [M2B](milestone-2b.md)。这只解除下载准备阻塞，不改变下列设备、驱动、显存、FP16/eager 加载和真实 Agent 结果的 Pending 状态。
+| 模型 | 环境 | 模型配置 |
+| --- | --- | --- |
+| Qwen2.5-1.5B-Instruct | Torch 2.2.2+cu121、Transformers 4.46.3 | `configs/model/qwen2.5-1.5b.toml` |
+| Qwen3-8B | Torch 2.5.1+cu121、Transformers 4.51.3 | `configs/model/qwen3-8b.toml` |
 
-## 已实测的登录节点元数据
+模型配置显式指定 `float16`，不依赖 `torch_dtype="auto"`。当前路径不使用 BF16 或 FlashAttention-2。
 
-| 项目 | 结果 | 证据/边界 |
-|---|---|---|
-| Slurm 用户关联 | `pi_daipeishan_r`: normal/overdue；`pi_daipeishan`: cpuq/fatq/gpuq/normal；`free`: normal | `sacctmgr -n -P show assoc where user=$USER ...`；关联存在不等于收费授权 |
-| gpu2Q | `gpu[201-210]`，允许 QOS `gpuq,normal`，MaxTime=UNLIMITED；BillingWeights `cpu=1.0,mem=0.25G,gres/gpu:tesla=2.0` | `scontrol show partition gpu2Q`；不由 tesla 标签推断 V100 型号或账单价格 |
-| QOS gpuq | MaxJobsPU=200，MaxSubmitPU=50；MaxWall/MaxTRESPU 输出为空 | `sacctmgr show qos` 原始字段；未验证账户/分区交集和调度可接受性 |
-| QOS normal | MaxJobsPU=200，MaxSubmitPU=5，MaxWall=3-00:00:00，MaxTRESPU=cpu=288 | 不是用户可长期占满资源的许可；脚本主动限制单卡和短时限 |
-| Lustre 个人用量 | 2,579,951,548 KiB，约 2.40 TiB | `lfs quota -u "$USER" /public` |
-| Lustre 软/硬配额 | 3,221,225,472 / 4,294,967,296 KiB，即 3 / 4 TiB；软配额剩余约 613 GiB | 这是用户级配额；`df` 的共享剩余空间不能替代它 |
-| 旧 quota 命令 | `quota -s` 对历史 NFS 挂载报 stale file handle | 使用 Lustre 查询补齐；没有修改挂载 |
-| 模型缓存位置 | 默认项目 `artifacts/model-cache`，可用 `EARL_MODEL_CACHE` 显式指定 | 已取得 tokenizer/配置；权重限时下载未完成，无完整缓存清单；离线服务不自行下载 |
+1.5B 早期 FP16 eager attention 出现 QK 溢出，切到 SDPA math 后恢复有限输出，见 [诊断记录](v100-inference-stability.md)。
 
-独立 GPU 环境已实际安装；`pip check` 通过。登录节点仅完成 Torch 2.2.2+cu121、CUDA 编译版本 12.1、CPU tensor 及 Transformers 类导入检查；没有初始化 GPU 或加载模型。这证明当前 glibc 下的 CPU 导入兼容性，不证明计算节点驱动或 FP16 推理兼容性。实际固定 revision tokenizer 的 chat template 在 CPU 上通过，示例 prompt 为 180 token，eos_token_id=151645；见 `experiments/m2a-preparation/tokenizer-check.json`，不是模型内容生成结果。
+## 训练
 
-## 必须由获准 GPU 作业补齐的证据
+SFT/GRPO 的 SDPA math context 覆盖 forward、backward 和 checkpoint recompute。仅包住 forward，反向重算仍可能选到其他算子。
 
-| 验收项 | 当前状态 | 预期证据 |
-|---|---|---|
-| 实际型号/总显存/驱动/Compute Capability | Pending | `artifacts/gpu-inventory-<job>/inventory.json` 的 nvidia-smi、Torch properties |
-| CUDA driver API / runtime / nvcc | Pending | 审计分别记录三者，区分 wheel 自带 runtime 与 module toolkit |
-| Torch 编译架构及 sm_70 | Pending | 审计 get_arch_list；服务启动也检查 sm_70 |
-| Singularity `--nv` | Pending | 用已有本地镜像指定 `EARL_AUDIT_IMAGE` 后运行；仅 module 可用不算通过 |
-| Qwen FP16/eager 加载与生成 | Pending | `server/model-load.json`、`single-generation.json`、原始 generations.jsonl |
-| Agent 自主多轮与业务成功 | Pending | 原有 top-2025 的模型轨迹、SQL 工具反馈和独立 reward；模型加载成功不能代替它 |
-| Base validation/test 评测 | Pending | 完整 report.json、每任务轨迹、冻结 manifest 哈希、执行配置 |
-| 加载耗时、峰值显存、吞吐、延迟 | Pending | 每次生成和加载的真实测量；当前没有数值 |
+checkpoint 使用 `use_reentrant=True`，并启用输入梯度。optimizer 只持有 LoRA 参数，Base 冻结；AMP 对非有限梯度执行 skip/backoff，并按同一批次恢复重放。
 
-## 固定兼容路径
+历史 1.5B GPU 恢复比较中，完整 math scope 得到参数和 optimizer 差异为零。Qwen3 已完成真实更新与独立重载，其 GPU 恢复等价仍未验证。
 
-`configs/model/qwen2.5-1.5b.toml` 固定模型为 `Qwen/Qwen2.5-1.5B-Instruct`，revision `989aa7980e4cf806f80c7fef2b1adb7bc71aa306`。已通过官方固定 revision 页面核验：[模型文件](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct/tree/989aa7980e4cf806f80c7fef2b1adb7bc71aa306)。目标是该 Instruct 检查点的未进行项目 SFT/GRPO 的基线；不把它称为纯预训练 Qwen2.5-1.5B。
+## Slurm
 
-采用独立 `.venv-gpu`、Torch 2.2.2（CUDA 12.1 wheel）、Transformers 4.46.3、NumPy 1.26.4、tokenizers 0.20.3、safetensors 0.4.5。完整版本见 `requirements/gpu-py312-linux.lock`；CPU `.venv` 与原锁文件保留。CUDA 12.1 wheel 的候选选择参考 [PyTorch 官方历史版本](https://pytorch.org/get-started/previous-versions/)。驱动能否运行该组合仍须计算节点实测；若不兼容，先按审计结果建立另一份锁，不升级系统驱动。
+Qwen3 训练示例申请 1 GPU、4 CPU、64 GB；Base/SFT 并行评测需要两张 GPU、8 CPU、96 GB。1.5B 的资源由各 wrapper 固定。
 
-上游模型配置标为 BF16，服务不使用 `torch_dtype="auto"`，而是显式 `torch.float16`；生产 Runtime 使用 `attention_backend="sdpa_math"`，映射到官方 `attn_implementation="sdpa"`，并在每次生成中强制 SDPA math。FP16 eager 仅保留为诊断对照，FP32 attention-score accumulation 仅保留为 research/debug reference。Qwen2 已包含于固定 Transformers 版本，见 [官方 Qwen2 文档](https://huggingface.co/docs/transformers/v4.46.3/en/model_doc/qwen2)。没有启用 BF16、FlashAttention-2、vLLM、verl 或自定义新架构算子，也没有做训练。Job 20385898 的根因和生产集成说明见 [V100 inference stability](v100-inference-stability.md)；代码集成后的 GPU 验收仍需单独执行。
+提交前核对实际 GPU、CPU、内存、时限、账户和 QoS。兼容分区可以切换；替换 pending 作业时先确认旧作业未启动，运行与重试统一计入预算。
 
-## 授权后的运行顺序
+`nvcc` 版本、Torch wheel 的 CUDA runtime、节点驱动和 GPU 型号分别记录。排队时间、wrapper wall time、Slurm allocation 也分别统计。
 
-先准备依赖与缓存（不加载模型），再经授权按审计→单轮→Agent smoke→validation→冻结配置后的 test 顺序提交。具体命令和产物见 `docs/milestone-2a.md`。本次只做 shell 语法检查，没有执行 `sbatch --test-only` 或真实 GPU 提交；脚本资源声明不等于调度器已接受账户/QOS。
+GPU 脚本在计算节点运行，模型从已校验的 cache 离线加载。[Qwen3 入口](qwen3-post-training.md) · [GRPO](grpo-training.md)

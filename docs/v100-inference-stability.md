@@ -1,81 +1,31 @@
-# V100 inference stability
+# FP16 attention 溢出诊断
 
-## Problem
+历史诊断使用 Qwen2.5-1.5B-Instruct、Torch 2.2.2+cu121、Transformers 4.46.3。Job `20385898` 在 V100S 32GB 上完成。
 
-On the pinned V100-SM70 stack (`PyTorch 2.2.2+cu121`, `Transformers 4.46.3`), Qwen FP16 inference through the eager attention path is numerically unstable. FP32 eager inference is finite, while FP16 eager inference can produce non-finite attention scores before generation makes a token decision.
+## 现象与原因
 
-The production path is therefore:
+FP32 eager 输出有限；FP16 eager 在第一层 `attention_scores_qk` 出现非有限值。Q、K 本身有限，FP16 QKᵀ 溢出产生 858 个 +Inf、195 个 -Inf，随后 softmax 和最终 logits 出现 NaN。
 
-`FP16 weights + SDPA math backend`
+## 对照
 
-FP32 remains a diagnostic/reference path, not the production default.
+| 路径 | 结果 |
+| --- | --- |
+| FP32 eager | 有限，36.88 token/s |
+| FP16 eager | QK scores 和 logits 非有限 |
+| FP16 + SDPA math | finite ratio 1.0，44.40 token/s |
 
-## Evidence
+该次记录的峰值 reserved VRAM 约 13.15 GB。速度和显存仅对应此诊断配置，不作为 Qwen3 或其他 batch 的性能结论。
 
-The root-cause experiment was completed by the unique GPU Job `20385898` on a V100S-PCIE-32GB (compute capability 7.0):
+## 修复
 
-| Path | Result |
-|---|---|
-| FP32 eager | finite/reference path |
-| FP16 eager | non-finite QK scores and final logits |
-| FP16 + SDPA math | finite ratio `1.0` |
-| FP16 + SDPA math throughput | `44.40 tok/s` |
-| FP32 throughput | `36.88 tok/s` |
-| Peak reserved VRAM | approximately `13.15 GB` |
+模型配置使用 `attention_backend="sdpa_math"`，映射到 Transformers 的 `attn_implementation="sdpa"`。运行时局部启用 math，关闭 flash 和 mem-efficient。
 
-## Root cause
+加载和生成均设置 `output_attentions=False`，避免 Qwen2 为返回 attention weights 而退回 eager。FP32 attention-score accumulation 保留为诊断参考。
 
-The first non-finite tensor was:
+## 故障记录
 
-`decoder_layer[0].self_attn.attention_scores_qk`
+每个生成步骤在选 token 前检查 logits。发现 NaN/Inf 时抛出 `non_finite_logits`，记录 step、shape、dtype、device、finite ratio、NaN/Inf 数量和模型身份。
 
-The Q and K tensors were finite, but their FP16 QKᵀ product overflowed:
+正常事件记录 token、耗时、吞吐、allocator 峰值和实际 backend。非有限值不替换为零，也不通过改采样参数掩盖。
 
-- `+Inf`: `858`
-- `-Inf`: `195`
-
-The overflow propagated into softmax, producing NaNs, and then into the final logits. The FP32 attention-score accumulation path is retained in the diagnostic code as a research/debug reference only; it is not wired into the production Runtime.
-
-## Solution
-
-The model configuration uses the explicit setting:
-
-`attention_backend = "sdpa_math"`
-
-The Runtime maps this setting to the official Transformers API:
-
-`attn_implementation="sdpa"`
-
-For each model generation call, it enters a local PyTorch SDPA context with:
-
-```text
-flash = disabled
-math = enabled
-mem_efficient = disabled
-```
-
-On the pinned PyTorch 2.2.2 environment this uses `torch.backends.cuda.sdp_kernel`. The newer `torch.nn.attention.sdpa_kernel` form is only a fallback for an already-installed environment; this change does not upgrade PyTorch or Transformers. CPU execution uses a no-op context.
-
-The Runtime also passes `output_attentions=False` when loading and generating, and verifies the effective Transformers implementation. This prevents Qwen2 SDPA from being silently downgraded to eager attention because attention weights were requested.
-
-The checkpoint, checkpoint revision, and `generation_config` are not modified.
-
-## Finite-logit guard
-
-The Runtime installs a Transformers-compatible `LogitsProcessor` for every autoregressive generation. It checks `torch.isfinite(logits).all()` immediately before the sampling/greedy decision at generation step 0 and at every later step.
-
-On failure it raises `non_finite_logits` and records:
-
-- generation step;
-- logits shape, dtype, device, and finite ratio;
-- calculable finite min/max values and NaN/+Inf/-Inf counts;
-- attention backend, model revision, and GPU name;
-- the full diagnostic context in the generation artifact and a dedicated JSON diagnostic file.
-
-There is no NaN/Inf replacement, token-0 fallback, sampling-parameter adjustment, or prompt modification. The event telemetry sets `non_finite_logits_detected=true`; normal runs set it to `false`.
-
-## Runtime telemetry
-
-Each generation artifact records model revision, model dtype, device, GPU name, compute capability, attention backend, input/output token counts, load time, generation latency, throughput, peak allocated/reserved memory, the selected SDPA control API, and the non-finite-logits flag. Existing latency and memory aliases remain for downstream trajectory/evaluation readers.
-
-GPU acceptance for this production integration must still be run explicitly on the V100. This implementation stage submits no GPU job and does not run Protocol, Agent, Base, SFT, or GRPO workloads.
+训练时还需要把 math context 覆盖到 backward/recompute，见 [V100 运行说明](v100-compatibility.md)。
