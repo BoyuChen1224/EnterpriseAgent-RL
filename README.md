@@ -9,19 +9,21 @@
 - **后训练**：LoRA SFT、真实环境 GRPO rollout、token/logprob/mask 对齐、策略更新和 checkpoint 恢复。
 - **模型服务**：FastAPI 任务提交、状态与轨迹查询；固定 SFT 模型身份、进程生命周期和退出清理。
 
-已验证模型为 **Qwen2.5-1.5B-Instruct**，单 V100 使用 FP16 + SDPA math。
+当前主线模型为 **Qwen3-8B**，已在单张 V100 32GB 上验证 LoRA SFT、GRPO 更新与模型重载，使用 **FP16 + SDPA math，关闭 thinking**。保留 Qwen2.5-1.5B-Instruct 的历史实现与实验。
 
 ## 实验结果
 
-同一组 20 个 validation 任务、相同冻结评测协议：
+Qwen3-8B 在固定的 20 个 validation 任务上完成 Base/SFT 与 SFT/RL 两组配对评测；每臂均 20/20 正式评分，technical unknown=0：
 
 | 模型 | 业务成功 | 成功率 |
 | --- | ---: | ---: |
-| Base | 0/20 | 0% |
-| SFT N | 8/20 | 40% |
-| SFT N + GRPO delta | 8/20 | 40% |
+| Qwen3-8B Base | 0/20 | 0% |
+| Runtime 对齐 SFT | 13/20 | 65% |
+| SFT + GRPO delta | 13/20 | 65% |
 
-SFT 相对 Base 提升 **40 个百分点**；本轮有限 GRPO 未带来额外成功率收益。结果来自单 seed、小规模共享 schema/template 面板，尚不能说明跨库泛化。真实 N 模型的 HTTP → Agent → SQL → Verifier 服务链路也已在 V100 验证。
+SFT 使用 **54 条 train-only 逐决策监督记录、27 次 LoRA 更新**，相对 Base 提升 **65 个百分点**。GRPO 从 16 条真实多轮 episode 中获得 2/4 个有奖励差异的任务组，复用固定批次完成 **2 次真实策略更新**；本轮未带来额外业务收益，20 个任务均无成功/失败变化。
+
+结果来自单 seed、两个合成数据库实例和共享 schema/template 的小面板，test 未运行。历史 1.5B 面板为 Base 0/20、SFT 8/20、RL 8/20；两套模型实验的配方和协议不同，不将其差值归因于模型规模。模型、数据库和原始运行产物不随源码发布。
 
 ## CPU 快速开始
 
