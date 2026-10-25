@@ -1,8 +1,43 @@
-# Formal GRPO 与冻结评测入口
+# GRPO 训练与冻结评测
 
-本手册描述 src/enterprise_agent_rl/grpo/、scripts/training/run_grpo.py 和当前 TOML 的真实入口。它区分 CPU fake/tiny 契约、真实 one-GPU train、eval-only Base/N/RL、离线聚合和固定 closeout；文件名不代表命令语义，必须看 parser 与 Slurm 默认变量。
+本手册先介绍当前 Qwen3-8B 固定批次更新，再保留历史 Qwen2.5-1.5B 在线入口。两条路径共享本地 GRPO loss/backend，但使用各自的模型、配置、数据和父 Adapter；命令名称不代表它们可以互换。
 
-## 当前状态与边界
+## 当前 Qwen3-8B 固定批次 pilot
+
+模型为 `Qwen/Qwen3-8B`，revision `b968826d9c46dd6066d109eabc6255188de91218`，FP16、SDPA math、thinking-off。环境和资产依赖见 [Qwen3 后训练指南](qwen3-post-training.md)。
+
+| 阶段 | 入口 | 配置 |
+| --- | --- | --- |
+| 冻结 SFT 分组采样 | `scripts/evaluation/run_qwen3_grpo_rollout.py` | `configs/evaluation/qwen3-grpo-rollout.toml` |
+| 批次校验、更新、重载、SFT/RL 对照 | `scripts/training/run_qwen3_grpo_pilot.py` | `configs/training/qwen3-grpo-update-pilot.toml` |
+| 单卡 Slurm 分阶段 wrapper | `scripts/slurm/qwen3_grpo_update_pilot.sbatch` | `T034_STAGE`、`EARL_T034_RUN`、`EARL_T034_CONFIG` |
+
+入口检查只需执行：
+
+```bash
+PYTHONPATH=src .venv-qwen3/bin/python scripts/evaluation/run_qwen3_grpo_rollout.py --help
+PYTHONPATH=src .venv-qwen3/bin/python scripts/training/run_qwen3_grpo_pilot.py --help
+```
+
+更新入口包含 `prepare`、`tiny`、`train`、`reload`、`compare`、`record-allocation` 和 `finalize`。其中 `train`、`reload`、`compare` 是独立 GPU 阶段；该入口没有新的 rollout 阶段。固定来源由配置中的文件路径和 SHA-256 校验，不能仅更换输出目录后假定资产齐全。
+
+### 采样与优化目标
+
+- 4 个 train task，每组 4 个真实多轮 episode，共 16/16 正式评分、unknown=0。2/4 个组存在奖励差异，另外两组全成功、优势为零。
+- 保存 118 条物理请求的原生 prompt/completion IDs、old policy logprob、采样 logprob 和 response mask；70 条有非零优势、48 条为零。
+- 组优势使用 sample standard deviation + `1e-4`；同一 episode 的请求继承其组优势。仅 response token 进入 policy loss，工具 observation 保持在上下文中。
+- 使用 clipped policy ratio，epsilon=0.2、beta=0；本轮没有 KL 惩罚。AdamW learning rate 为 `2e-6`，新 LoRA 为 rank 8/alpha 16/dropout 0，Base 和 parent 冻结。
+- 两次更新复用同一冻结 batch 和 old logprobs。每次对 70 条非零优势记录累计 backward；完整归一化分母为 4745 token，包含零优势记录。实际完成 140 次 backward、2 次成功 optimizer.step，AMP skip=0。
+
+### 加载与结果
+
+独立重载按 **fresh Base → parent SFT merge → GRPO delta merge**，两次 merge 各执行一次。父 SFT SHA 为 `413d1b0211ba93b2df322dcdaeb1fa1c3f019210c8ded510a2920e5ad6e114e9`，final delta SHA 为 `dc46efecbd519142ccca44fa3291861177f299bf0e599cced65094fea9e1260a`。禁止把 delta 当作脱离父 SFT 的独立模型。
+
+fresh SFT 与 RL 均在 20 项冻结 validation 上完成正式评分，均为 13/20，unknown=0；13 个共同成功、7 个共同失败，gain/loss 均为 0。更新、重载和完整评测成立，本轮没有额外业务收益。它是固定批次两更新的有限试验，不代表多轮在线训练、长训效果或跨库泛化。
+
+## 历史 1.5B 在线入口与结果
+
+以下各节记录 `scripts/training/run_grpo.py`、1.5B TOML、E-026 和固定 closeout；其中的 N、路径、默认 Slurm 参数与成功率均属于历史 1.5B 链，不替代上面的 Qwen3 配置。
 
 formal GRPO 已有有限真实 rollout、TokenRecord、响应 token mask、组内优势、更新/恢复和 T-023/E-025 final-delta 证据；E-026/T-025 已完成同一 20 项 validation panel 的 Base/N/RL 冻结对照。当前结果：
 
