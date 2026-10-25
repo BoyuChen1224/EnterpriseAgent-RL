@@ -12,6 +12,7 @@ import sys
 import textwrap
 import threading
 import time
+import venv
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -553,8 +554,10 @@ def test_real_signal_is_forwarded_to_owned_group_and_kill_is_bounded(
             process.wait(timeout=2)
 
 
-def test_explicit_venv_entrypoint_is_not_resolved_and_has_correct_prefix():
-    requested = ROOT / ".venv-gpu/bin/python"
+def test_explicit_venv_entrypoint_is_not_resolved_and_has_correct_prefix(tmp_path):
+    environment = tmp_path / "test-venv"
+    venv.EnvBuilder(with_pip=False, symlinks=True).create(environment)
+    requested = environment / "bin/python"
     entrypoint = launcher.resolve_python_executable(requested, root=ROOT)
     assert entrypoint == requested
     result = subprocess.run(
@@ -563,4 +566,4 @@ def test_explicit_venv_entrypoint_is_not_resolved_and_has_correct_prefix():
         capture_output=True,
         text=True,
     )
-    assert Path(result.stdout.strip()) == ROOT / ".venv-gpu"
+    assert Path(result.stdout.strip()) == environment

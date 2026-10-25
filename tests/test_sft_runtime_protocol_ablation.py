@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -22,17 +21,10 @@ from scripts.diagnostics.sft_runtime_protocol_ablation import (
     run_protocol_self_checks,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
-
 
 @pytest.fixture(scope="module")
-def real_cases():
-    return load_train_only_cases(
-        manifest_path=ROOT / "benchmarks/m2a/manifest.json",
-        dataset_path=ROOT / "artifacts/sft-data-train-teacher-v2/dataset.jsonl",
-        metadata_path=ROOT / "artifacts/sft-data-train-teacher-v2/dataset-metadata.json",
-        database_root=ROOT / "artifacts/m2a-databases-final",
-    )[0]
+def real_cases(train_protocol_data):
+    return load_train_only_cases(**train_protocol_data)[0]
 
 
 def test_streaming_loader_is_train_only(real_cases):
@@ -85,11 +77,11 @@ def test_initial_observation_is_retained_once_in_correct_position(real_cases):
     assert sum(message.get("content") == initial_text for message in messages) == 1
 
 
-def test_canonical_serializer_matches_training_formatter(real_cases):
+def test_canonical_serializer_matches_training_formatter(real_cases, train_protocol_data):
     case = next(case for case in real_cases if case.template_id == "schema")
     rows, _ = load_dataset_rows(
-        ROOT / "artifacts/sft-data-train-teacher-v2/dataset.jsonl",
-        ROOT / "artifacts/sft-data-train-teacher-v2/dataset-metadata.json",
+        train_protocol_data["dataset_path"],
+        train_protocol_data["metadata_path"],
     )
     row = next(row for row in rows if row["task_id"] == case.public_task.task_id)
     action_message = next(

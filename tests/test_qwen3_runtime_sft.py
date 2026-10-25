@@ -15,7 +15,6 @@ import pytest
 
 from enterprise_agent_rl.lora import inject_lora_modules
 from enterprise_agent_rl.qwen3_sft import (
-    DATASET_SHA256,
     build_full_tokenized_dataset,
     make_schedule,
     train_lora_schedule,
@@ -59,11 +58,9 @@ class _HardOffTokenizer:
         return None
 
 
-def test_full_source_is_rerendered_and_schedule_is_fixed(tmp_path: Path):
-    source = Path(
-        "artifacts/sft-runtime-aligned-decision-pilot/t017-r2-v1/decision/tokenized-dataset.jsonl"
-    )
-    rows = load_decision_rows(source, expected_sha256=DATASET_SHA256)
+def test_full_source_is_rerendered_and_schedule_is_fixed(tmp_path: Path, synthetic_decision_source):
+    source, source_sha256 = synthetic_decision_source
+    rows = load_decision_rows(source, expected_sha256=source_sha256)
     tokenizer = _HardOffTokenizer()
     examples, formatted, identity = build_full_tokenized_dataset(
         tokenizer, rows, max_context_tokens=2048, enable_thinking=False
@@ -84,7 +81,7 @@ def test_full_source_is_rerendered_and_schedule_is_fixed(tmp_path: Path):
     manifest = write_tokenized_artifacts(
         tmp_path / "training",
         source_path=source,
-        source_sha256=DATASET_SHA256,
+        source_sha256=source_sha256,
         examples=examples,
         formatted=formatted,
         config_identity=identity,

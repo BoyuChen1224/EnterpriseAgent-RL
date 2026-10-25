@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from scripts.diagnostics.sft_runtime_ablation_postmortem import (
     aggregate_records,
     build_postmortem,
@@ -74,6 +76,13 @@ def test_sql_rates_use_sql_action_denominator_and_exact_repetition():
     assert metrics["sql_repeat_rate"] == 0.5
 
 
+@pytest.mark.local_artifacts
+@pytest.mark.skipif(
+    not (
+        ROOT / "artifacts/sft-runtime-ablation/20261017T130311Z-sft-runtime-protocol-ablation"
+    ).is_dir(),
+    reason="Historical ablation evidence is a local, Git-ignored artifact bundle.",
+)
 def test_saved_artifact_postmortem_matches_all_group_summaries():
     root = ROOT / "artifacts/sft-runtime-ablation/20261017T130311Z-sft-runtime-protocol-ablation"
     postmortem = build_postmortem(root)

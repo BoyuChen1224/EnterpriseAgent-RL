@@ -46,12 +46,20 @@ def _guard(path: Path, *, name: str = "t034-cpu") -> BudgetGuard:
     return guard
 
 
-def test_fixed_config_and_real_batch_have_frozen_counts(tmp_path):
+def test_fixed_config_has_frozen_model_and_module_count(tmp_path):
     config, _ = load_qwen3_update_config(
         T034_CONFIG, RunContext(REPO_ROOT, tmp_path / "run", T034_CONFIG)
     )
     assert config.model["model_id"] == "Qwen/Qwen3-8B"
     assert config.lora["module_count"] == 252
+
+
+@pytest.mark.local_artifacts
+@pytest.mark.skipif(
+    not (T033_RUN / "artifact-manifest.json").is_file(),
+    reason="The frozen T-033 experiment is a local, Git-ignored artifact bundle.",
+)
+def test_real_batch_has_frozen_counts(tmp_path):
     output = tmp_path / "train-batch.jsonl"
     summary = build_frozen_train_batch(T033_RUN, output)
     assert summary["counts"] == {
@@ -70,11 +78,29 @@ def test_fixed_config_and_real_batch_have_frozen_counts(tmp_path):
     assert hashlib.sha256(output.read_bytes()).hexdigest() == summary["output_sha256"]
 
 
+def _synthetic_batch():
+    lengths = [49] * 69 + [77] + [26] * 47 + [65]
+    return [
+        {
+            "record_type": "TOKEN",
+            "request_id": f"synthetic-{index}",
+            "advantage": 1.0 if index < 70 else 0.0,
+            "prompt_token_ids": [1] * (EXPECTED_MAX_SEQUENCE - length if index == 0 else 2),
+            "generated_token_ids": [2] * length,
+            "completion_mask": [1] * length,
+            "old_per_token_logps": [-1.0] * length,
+        }
+        for index, length in enumerate(lengths)
+    ]
+
+
+def test_batch_validator_accepts_complete_synthetic_contract():
+    assert validate_train_batch(_synthetic_batch())["total_tokens"] == EXPECTED_TOTAL_TOKENS
+
+
 @pytest.mark.parametrize("bad_value", [None, float("nan"), float("inf"), "0"])
-def test_batch_validator_rejects_null_or_nonfinite_advantage(tmp_path, bad_value):
-    output = tmp_path / "train-batch.jsonl"
-    build_frozen_train_batch(T033_RUN, output)
-    rows = [json.loads(line) for line in output.read_text().splitlines()]
+def test_batch_validator_rejects_null_or_nonfinite_advantage(bad_value):
+    rows = _synthetic_batch()
     rows[0]["advantage"] = bad_value
     with pytest.raises(ValueError, match="advantage_invalid"):
         validate_train_batch(rows)

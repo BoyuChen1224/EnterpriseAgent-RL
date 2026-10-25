@@ -25,6 +25,7 @@ enterprise_agent_rl = ["grpo/LICENSE-TRL.txt", "grpo/NOTICE-TRL.txt"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = ["local_artifacts: validates historical Git-ignored experiment bundles when present"]
 
 [tool.ruff]
 line-length = 100
