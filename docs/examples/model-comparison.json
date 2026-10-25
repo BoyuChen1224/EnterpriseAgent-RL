@@ -1,0 +1,1286 @@
+{
+  "schema_version": "1.0",
+  "description": "Saved model-generated queries and observed results; no inference was rerun. Training recipes differ across models.",
+  "results": [
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "Base",
+      "successes": 0,
+      "scored": 20,
+      "unknown": 0
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "SFT",
+      "successes": 8,
+      "scored": 20,
+      "unknown": 0
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "GRPO",
+      "successes": 8,
+      "scored": 20,
+      "unknown": 0
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "Base",
+      "successes": 0,
+      "scored": 20,
+      "unknown": 0
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "SFT",
+      "successes": 13,
+      "scored": 20,
+      "unknown": 0
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "GRPO",
+      "successes": 13,
+      "scored": 20,
+      "unknown": 0
+    }
+  ],
+  "template_results": [
+    {
+      "template": "schema",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 2,
+      "Qwen2.5-1.5B-Instruct/GRPO": 2,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 2,
+      "Qwen3-8B/GRPO": 2
+    },
+    {
+      "template": "region",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 2,
+      "Qwen2.5-1.5B-Instruct/GRPO": 2,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 0,
+      "Qwen3-8B/GRPO": 0
+    },
+    {
+      "template": "top",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 0,
+      "Qwen2.5-1.5B-Instruct/GRPO": 0,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 2,
+      "Qwen3-8B/GRPO": 2
+    },
+    {
+      "template": "customer",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 0,
+      "Qwen2.5-1.5B-Instruct/GRPO": 0,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 1,
+      "Qwen3-8B/GRPO": 1
+    },
+    {
+      "template": "product",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 0,
+      "Qwen2.5-1.5B-Instruct/GRPO": 0,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 0,
+      "Qwen3-8B/GRPO": 0
+    },
+    {
+      "template": "empty",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 2,
+      "Qwen2.5-1.5B-Instruct/GRPO": 2,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 2,
+      "Qwen3-8B/GRPO": 2
+    },
+    {
+      "template": "constraints",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 0,
+      "Qwen2.5-1.5B-Instruct/GRPO": 0,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 0,
+      "Qwen3-8B/GRPO": 0
+    },
+    {
+      "template": "recovery",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 0,
+      "Qwen2.5-1.5B-Instruct/GRPO": 0,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 2,
+      "Qwen3-8B/GRPO": 2
+    },
+    {
+      "template": "status",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 2,
+      "Qwen2.5-1.5B-Instruct/GRPO": 2,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 2,
+      "Qwen3-8B/GRPO": 2
+    },
+    {
+      "template": "monthly",
+      "Qwen2.5-1.5B-Instruct/Base": 0,
+      "Qwen2.5-1.5B-Instruct/SFT": 0,
+      "Qwen2.5-1.5B-Instruct/GRPO": 0,
+      "Qwen3-8B/Base": 0,
+      "Qwen3-8B/SFT": 2,
+      "Qwen3-8B/GRPO": 2
+    }
+  ],
+  "examples": [
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "Base",
+      "task_id": "validation-0-schema",
+      "prompt": "先使用 schema 确认客户表字段，列出客户名称和区域编号，返回 customer, region_id，按客户名排序。",
+      "success": false,
+      "terminal_reason": "tool_budget_exhausted",
+      "score_reason": "tool_budget_exhausted",
+      "verifier_components": {
+        "final_correct": false,
+        "business_constraints": false,
+        "business_probe_verified": true,
+        "schema_verified": false,
+        "recovery_verified": true,
+        "within_budget": false,
+        "sql_execution_rate": 0.0,
+        "tool_errors": 15.0,
+        "repeated_calls": 14.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "finish",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "finish",
+        "sql"
+      ],
+      "sql_queries": [
+        "SELECT customer, region_id FROM customer ORDER BY customer"
+      ],
+      "tool_errors": [
+        "finish_requires_checked_sql_evidence",
+        "no such table: customer",
+        "tool_budget_exhausted"
+      ],
+      "final_answer": {},
+      "source": "artifacts/frozen-base-sft-rl-evaluation/t024-v1-r2/evaluation/Base/trajectories/Base-validation-0-schema.json",
+      "source_sha256": "499e7e2a93cbc098464e9dd3b471590778a7566c16e28194120436c909c7b0df"
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "Base",
+      "task_id": "validation-0-top",
+      "prompt": "先查询 2023 年已支付订单数量（列 paid_orders），再列消费最高的前 3 名客户，返回 customer, revenue_cents，收入降序、客户名升序。",
+      "success": false,
+      "terminal_reason": "tool_budget_exhausted",
+      "score_reason": "tool_budget_exhausted",
+      "verifier_components": {
+        "final_correct": false,
+        "business_constraints": false,
+        "business_probe_verified": false,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": false,
+        "sql_execution_rate": 0.0,
+        "tool_errors": 15.0,
+        "repeated_calls": 14.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql"
+      ],
+      "sql_queries": [
+        "SELECT customer, SUM(revenue_cents) AS total_revenue FROM orders WHERE YEAR(order_date) = 2023 GROUP BY customer ORDER BY total_revenue DESC LIMIT 3"
+      ],
+      "tool_errors": [
+        "no such column: customer",
+        "tool_budget_exhausted"
+      ],
+      "final_answer": {},
+      "source": "artifacts/frozen-base-sft-rl-evaluation/t024-v1-r2/evaluation/Base/trajectories/Base-validation-0-top.json",
+      "source_sha256": "d758bb1e38706a3481a08df638c3b68882512ad972e25f48dfcc99f61f09010b"
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "Base",
+      "task_id": "validation-0-region",
+      "prompt": "统计 2023 年各区域已支付订单收入（分），返回 region, revenue_cents，按 region 排序。",
+      "success": false,
+      "terminal_reason": "tool_budget_exhausted",
+      "score_reason": "tool_budget_exhausted",
+      "verifier_components": {
+        "final_correct": false,
+        "business_constraints": false,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": false,
+        "sql_execution_rate": 0.0,
+        "tool_errors": 15.0,
+        "repeated_calls": 14.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql"
+      ],
+      "sql_queries": [
+        "SELECT region, SUM(revenue_cents) AS total_revenue FROM orders WHERE YEAR(order_date) = 2023 GROUP BY region ORDER BY total_revenue DESC"
+      ],
+      "tool_errors": [
+        "no such column: region",
+        "tool_budget_exhausted"
+      ],
+      "final_answer": {},
+      "source": "artifacts/frozen-base-sft-rl-evaluation/t024-v1-r2/evaluation/Base/trajectories/Base-validation-0-region.json",
+      "source_sha256": "2b5a76fe99d35416e66b51a15adbe7b7556b0b57bac4c433a7248f8f0ef06651"
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "SFT",
+      "task_id": "validation-0-schema",
+      "prompt": "先使用 schema 确认客户表字段，列出客户名称和区域编号，返回 customer, region_id，按客户名排序。",
+      "success": true,
+      "terminal_reason": "completed",
+      "score_reason": "success",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT name AS customer,region_id FROM customers ORDER BY customer"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "customer",
+          "region_id"
+        ],
+        "rows": [
+          [
+            "validation-0-Customer-01",
+            1
+          ],
+          [
+            "validation-0-Customer-02",
+            2
+          ],
+          [
+            "validation-0-Customer-03",
+            3
+          ],
+          [
+            "validation-0-Customer-04",
+            4
+          ],
+          [
+            "validation-0-Customer-05",
+            1
+          ],
+          [
+            "validation-0-Customer-06",
+            2
+          ],
+          [
+            "validation-0-Customer-07",
+            3
+          ],
+          [
+            "validation-0-Customer-08",
+            4
+          ],
+          [
+            "validation-0-Customer-09",
+            1
+          ],
+          [
+            "validation-0-Customer-10",
+            2
+          ],
+          [
+            "validation-0-Customer-11",
+            3
+          ],
+          [
+            "validation-0-Customer-12",
+            4
+          ],
+          [
+            "validation-0-Customer-13",
+            1
+          ],
+          [
+            "validation-0-Customer-14",
+            2
+          ],
+          [
+            "validation-0-Customer-15",
+            3
+          ],
+          [
+            "validation-0-Customer-16",
+            4
+          ]
+        ]
+      },
+      "source": "artifacts/frozen-base-sft-rl-evaluation/t024-v1-r2/evaluation/N/trajectories/N-validation-0-schema.json",
+      "source_sha256": "537b1d3f865487d17a0e51eed52b32577feaa07b1ccfd5a467aa7828f328ff1c"
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "SFT",
+      "task_id": "validation-0-top",
+      "prompt": "先查询 2023 年已支付订单数量（列 paid_orders），再列消费最高的前 3 名客户，返回 customer, revenue_cents，收入降序、客户名升序。",
+      "success": false,
+      "terminal_reason": "completed",
+      "score_reason": "constraint_violation",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": false,
+        "business_probe_verified": false,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT c.name AS customer,\n                SUM(i.quantity*i.unit_price_cents) AS revenue_cents\n                FROM customers c JOIN orders o ON o.customer_id=c.id\n                JOIN order_items i ON i.order_id=o.id\n                WHERE o.status='paid' AND o.ordered_at>='2023-01-01' AND o.ordered_at<'2024-01-01'\n                GROUP BY c.id,c.name\n                ORDER BY revenue_cents DESC,customer ASC LIMIT 3"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "customer",
+          "revenue_cents"
+        ],
+        "rows": [
+          [
+            "validation-0-Customer-04",
+            2530700
+          ],
+          [
+            "validation-0-Customer-08",
+            2390100
+          ],
+          [
+            "validation-0-Customer-07",
+            2201600
+          ]
+        ]
+      },
+      "source": "artifacts/frozen-base-sft-rl-evaluation/t024-v1-r2/evaluation/N/trajectories/N-validation-0-top.json",
+      "source_sha256": "5ad03a942e3a7b9c6a908132e7431115b46af30815015b085d94e29add6282fc"
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "SFT",
+      "task_id": "validation-0-region",
+      "prompt": "统计 2023 年各区域已支付订单收入（分），返回 region, revenue_cents，按 region 排序。",
+      "success": true,
+      "terminal_reason": "completed",
+      "score_reason": "success",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT r.name AS region,SUM(i.unit_price_cents*i.quantity) AS revenue_cents FROM regions r JOIN customers c ON c.region_id=r.id JOIN orders o ON o.customer_id=c.id JOIN order_items i ON i.order_id=o.id WHERE o.status='paid' AND o.ordered_at>='2023-01-01' AND o.ordered_at<'2024-01-01' GROUP BY r.name ORDER BY region"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "region",
+          "revenue_cents"
+        ],
+        "rows": [
+          [
+            "East",
+            5324500
+          ],
+          [
+            "North",
+            4549300
+          ],
+          [
+            "South",
+            3537800
+          ],
+          [
+            "West",
+            6208800
+          ]
+        ]
+      },
+      "source": "artifacts/frozen-base-sft-rl-evaluation/t024-v1-r2/evaluation/N/trajectories/N-validation-0-region.json",
+      "source_sha256": "101ffea3649f287e0627c563a418aa9995f4e7326a9267697ee33cb95086f6ab"
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "GRPO",
+      "task_id": "validation-0-schema",
+      "prompt": "先使用 schema 确认客户表字段，列出客户名称和区域编号，返回 customer, region_id，按客户名排序。",
+      "success": true,
+      "terminal_reason": "completed",
+      "score_reason": "success",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT name AS customer,region_id FROM customers ORDER BY customer"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "customer",
+          "region_id"
+        ],
+        "rows": [
+          [
+            "validation-0-Customer-01",
+            1
+          ],
+          [
+            "validation-0-Customer-02",
+            2
+          ],
+          [
+            "validation-0-Customer-03",
+            3
+          ],
+          [
+            "validation-0-Customer-04",
+            4
+          ],
+          [
+            "validation-0-Customer-05",
+            1
+          ],
+          [
+            "validation-0-Customer-06",
+            2
+          ],
+          [
+            "validation-0-Customer-07",
+            3
+          ],
+          [
+            "validation-0-Customer-08",
+            4
+          ],
+          [
+            "validation-0-Customer-09",
+            1
+          ],
+          [
+            "validation-0-Customer-10",
+            2
+          ],
+          [
+            "validation-0-Customer-11",
+            3
+          ],
+          [
+            "validation-0-Customer-12",
+            4
+          ],
+          [
+            "validation-0-Customer-13",
+            1
+          ],
+          [
+            "validation-0-Customer-14",
+            2
+          ],
+          [
+            "validation-0-Customer-15",
+            3
+          ],
+          [
+            "validation-0-Customer-16",
+            4
+          ]
+        ]
+      },
+      "source": "artifacts/frozen-base-sft-rl-evaluation/t024-v1-r2/evaluation/RL/trajectories/RL-validation-0-schema.json",
+      "source_sha256": "ad1204be90516b24ca4e363dcab71a5449b91301c8beee5d69046290f331c036"
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "GRPO",
+      "task_id": "validation-0-top",
+      "prompt": "先查询 2023 年已支付订单数量（列 paid_orders），再列消费最高的前 3 名客户，返回 customer, revenue_cents，收入降序、客户名升序。",
+      "success": false,
+      "terminal_reason": "completed",
+      "score_reason": "constraint_violation",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": false,
+        "business_probe_verified": false,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT c.name AS customer,\n                SUM(i.quantity*i.unit_price_cents) AS revenue_cents\n                FROM customers c JOIN orders o ON o.customer_id=c.id\n                JOIN order_items i ON i.order_id=o.id\n                WHERE o.status='paid' AND o.ordered_at>='2023-01-01' AND o.ordered_at<'2024-01-01'\n                GROUP BY c.id,c.name\n                ORDER BY revenue_cents DESC,customer ASC LIMIT 3"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "customer",
+          "revenue_cents"
+        ],
+        "rows": [
+          [
+            "validation-0-Customer-04",
+            2530700
+          ],
+          [
+            "validation-0-Customer-08",
+            2390100
+          ],
+          [
+            "validation-0-Customer-07",
+            2201600
+          ]
+        ]
+      },
+      "source": "artifacts/frozen-base-sft-rl-evaluation/t024-v1-r2/evaluation/RL/trajectories/RL-validation-0-top.json",
+      "source_sha256": "d13af1208356e2aa0e4e5fe21379e0c07a45cfafa9de1701ea275e21f0e955a6"
+    },
+    {
+      "model": "Qwen2.5-1.5B-Instruct",
+      "stage": "GRPO",
+      "task_id": "validation-0-region",
+      "prompt": "统计 2023 年各区域已支付订单收入（分），返回 region, revenue_cents，按 region 排序。",
+      "success": true,
+      "terminal_reason": "completed",
+      "score_reason": "success",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT r.name AS region,SUM(i.unit_price_cents*i.quantity) AS revenue_cents FROM regions r JOIN customers c ON c.region_id=r.id JOIN orders o ON o.customer_id=c.id JOIN order_items i ON i.order_id=o.id WHERE o.status='paid' AND o.ordered_at>='2023-01-01' AND o.ordered_at<'2024-01-01' GROUP BY r.name ORDER BY region"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "region",
+          "revenue_cents"
+        ],
+        "rows": [
+          [
+            "East",
+            5324500
+          ],
+          [
+            "North",
+            4549300
+          ],
+          [
+            "South",
+            3537800
+          ],
+          [
+            "West",
+            6208800
+          ]
+        ]
+      },
+      "source": "artifacts/frozen-base-sft-rl-evaluation/t024-v1-r2/evaluation/RL/trajectories/RL-validation-0-region.json",
+      "source_sha256": "f282727f5946d4c7f103d0cdad4c8ff466307205f448c2c805a866471ca0fe55"
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "Base",
+      "task_id": "validation-0-schema",
+      "prompt": "先使用 schema 确认客户表字段，列出客户名称和区域编号，返回 customer, region_id，按客户名排序。",
+      "success": false,
+      "terminal_reason": "invalid_action_arguments",
+      "score_reason": "invalid_action_arguments",
+      "verifier_components": {
+        "final_correct": false,
+        "business_constraints": false,
+        "business_probe_verified": true,
+        "schema_verified": false,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 0.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [],
+      "sql_queries": [],
+      "tool_errors": [],
+      "final_answer": {},
+      "source": "artifacts/qwen3-runtime-sft-comparison/t032-v1/evaluation/base/worker-0/trajectories/7b75537c-2770-4611-b949-d23de5d81d45.json",
+      "source_sha256": "2dcb4905d42ccd62856b47ad23c19aa95b7b3e7ad3baab0ab40aa72d6320c269"
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "Base",
+      "task_id": "validation-0-top",
+      "prompt": "先查询 2023 年已支付订单数量（列 paid_orders），再列消费最高的前 3 名客户，返回 customer, revenue_cents，收入降序、客户名升序。",
+      "success": false,
+      "terminal_reason": "tool_budget_exhausted",
+      "score_reason": "tool_budget_exhausted",
+      "verifier_components": {
+        "final_correct": false,
+        "business_constraints": false,
+        "business_probe_verified": false,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": false,
+        "sql_execution_rate": 0.0,
+        "tool_errors": 15.0,
+        "repeated_calls": 11.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "plan",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "sql",
+        "check"
+      ],
+      "sql_queries": [
+        "SELECT COUNT(*) AS paid_orders FROM orders WHERE payment_status = 'paid' AND YEAR(order_date) = 2023;",
+        "SELECT COUNT(*) AS paid_orders FROM orders WHERE status = 'paid' AND YEAR(order_date) = 2023;",
+        "SELECT COUNT(*) AS paid_orders FROM orders WHERE status = 'paid' AND YEAR(order_datetime) = 2023;"
+      ],
+      "tool_errors": [
+        "no such column: payment_status",
+        "no such column: order_date",
+        "no such column: order_datetime",
+        "tool_budget_exhausted"
+      ],
+      "final_answer": {},
+      "source": "artifacts/qwen3-runtime-sft-comparison/t032-v1/evaluation/base/worker-0/trajectories/b94133bc-ba36-4e7c-ac2c-6d7b750494f5.json",
+      "source_sha256": "3b78e4bd0edfa94d402e7f66b41ade86c7570cdf34e28df6de51ce3a53a63e6d"
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "Base",
+      "task_id": "validation-0-region",
+      "prompt": "统计 2023 年各区域已支付订单收入（分），返回 region, revenue_cents，按 region 排序。",
+      "success": false,
+      "terminal_reason": "action_budget_exhausted",
+      "score_reason": "action_budget_exhausted",
+      "verifier_components": {
+        "final_correct": false,
+        "business_constraints": false,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 0.0,
+        "tool_errors": 8.0,
+        "repeated_calls": 7.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "plan",
+        "plan",
+        "sql",
+        "plan",
+        "plan",
+        "sql",
+        "plan",
+        "sql",
+        "plan",
+        "sql",
+        "plan",
+        "sql",
+        "plan",
+        "sql",
+        "plan",
+        "sql",
+        "plan",
+        "sql",
+        "plan"
+      ],
+      "sql_queries": [
+        "SELECT region, SUM(revenue_cents) AS revenue_cents FROM orders WHERE YEAR(order_date) = 2023 AND payment_status = 'paid' GROUP BY region ORDER BY region;"
+      ],
+      "tool_errors": [
+        "no such column: region",
+        "action_budget_exhausted"
+      ],
+      "final_answer": {},
+      "source": "artifacts/qwen3-runtime-sft-comparison/t032-v1/evaluation/base/worker-0/trajectories/a44f37fd-e321-4ee5-9fc0-b6c4afc076ab.json",
+      "source_sha256": "788fa3370dce6620d16b136eda672372720ce8dd0a8622530ade20cd4df7fc73"
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "SFT",
+      "task_id": "validation-0-schema",
+      "prompt": "先使用 schema 确认客户表字段，列出客户名称和区域编号，返回 customer, region_id，按客户名排序。",
+      "success": true,
+      "terminal_reason": "completed",
+      "score_reason": "success",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT name AS customer,region_id FROM customers ORDER BY customer"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "customer",
+          "region_id"
+        ],
+        "rows": [
+          [
+            "validation-0-Customer-01",
+            1
+          ],
+          [
+            "validation-0-Customer-02",
+            2
+          ],
+          [
+            "validation-0-Customer-03",
+            3
+          ],
+          [
+            "validation-0-Customer-04",
+            4
+          ],
+          [
+            "validation-0-Customer-05",
+            1
+          ],
+          [
+            "validation-0-Customer-06",
+            2
+          ],
+          [
+            "validation-0-Customer-07",
+            3
+          ],
+          [
+            "validation-0-Customer-08",
+            4
+          ],
+          [
+            "validation-0-Customer-09",
+            1
+          ],
+          [
+            "validation-0-Customer-10",
+            2
+          ],
+          [
+            "validation-0-Customer-11",
+            3
+          ],
+          [
+            "validation-0-Customer-12",
+            4
+          ],
+          [
+            "validation-0-Customer-13",
+            1
+          ],
+          [
+            "validation-0-Customer-14",
+            2
+          ],
+          [
+            "validation-0-Customer-15",
+            3
+          ],
+          [
+            "validation-0-Customer-16",
+            4
+          ]
+        ]
+      },
+      "source": "artifacts/qwen3-grpo-update-pilot/t034-v1/evaluation/sft/worker-0/trajectories/7607b0da-534d-4ace-a259-4f2d42451128.json",
+      "source_sha256": "50b65d5ba4000185c256a357038d3f37e50d75f1e20f4538b4a40ec80222844c"
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "SFT",
+      "task_id": "validation-0-top",
+      "prompt": "先查询 2023 年已支付订单数量（列 paid_orders），再列消费最高的前 3 名客户，返回 customer, revenue_cents，收入降序、客户名升序。",
+      "success": true,
+      "terminal_reason": "completed",
+      "score_reason": "success",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT COUNT(*) AS paid_orders FROM orders WHERE status='paid' AND ordered_at>='2023-01-01' AND ordered_at<'2024-01-01'",
+        "SELECT c.name AS customer,SUM(i.unit_price_cents*i.quantity) AS revenue_cents FROM orders o JOIN order_items i ON o.id=i.order_id JOIN customers c ON o.customer_id=c.id WHERE o.status='paid' AND o.ordered_at>='2023-01-01' AND o.ordered_at<'2024-01-01' GROUP BY c.id ORDER BY revenue_cents DESC,c.name ASC LIMIT 3"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "customer",
+          "revenue_cents"
+        ],
+        "rows": [
+          [
+            "validation-0-Customer-04",
+            2530700
+          ],
+          [
+            "validation-0-Customer-08",
+            2390100
+          ],
+          [
+            "validation-0-Customer-07",
+            2201600
+          ]
+        ]
+      },
+      "source": "artifacts/qwen3-grpo-update-pilot/t034-v1/evaluation/sft/worker-0/trajectories/463a79df-976f-4f01-98b7-7d27d4a7c75a.json",
+      "source_sha256": "b66ec49e87835ad0e2e34657199eb5b55f17ab76cdb7f9bc9477562769a85940"
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "SFT",
+      "task_id": "validation-0-region",
+      "prompt": "统计 2023 年各区域已支付订单收入（分），返回 region, revenue_cents，按 region 排序。",
+      "success": false,
+      "terminal_reason": "completed",
+      "score_reason": "incorrect_result",
+      "verifier_components": {
+        "final_correct": false,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT r.name AS region,SUM(i.quantity*i.unit_price_cents) AS revenue_cents FROM orders o JOIN order_items i ON o.id=i.order_id JOIN customers c ON o.customer_id=c.id JOIN regions r ON c.region_id=r.id WHERE o.status='已支付' AND o.ordered_at>='2023-01-01' AND o.ordered_at<'2024-01-01' GROUP BY r.name ORDER BY region"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "region",
+          "revenue_cents"
+        ],
+        "rows": []
+      },
+      "source": "artifacts/qwen3-grpo-update-pilot/t034-v1/evaluation/sft/worker-0/trajectories/d697fa73-1db7-49a2-a531-cdb8fbcbeece.json",
+      "source_sha256": "87f25e70b079c0e9611c4df2c159dd96ec5a3e11d12a71f51250f5ff7c46c580"
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "GRPO",
+      "task_id": "validation-0-schema",
+      "prompt": "先使用 schema 确认客户表字段，列出客户名称和区域编号，返回 customer, region_id，按客户名排序。",
+      "success": true,
+      "terminal_reason": "completed",
+      "score_reason": "success",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT name AS customer,region_id FROM customers ORDER BY customer"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "customer",
+          "region_id"
+        ],
+        "rows": [
+          [
+            "validation-0-Customer-01",
+            1
+          ],
+          [
+            "validation-0-Customer-02",
+            2
+          ],
+          [
+            "validation-0-Customer-03",
+            3
+          ],
+          [
+            "validation-0-Customer-04",
+            4
+          ],
+          [
+            "validation-0-Customer-05",
+            1
+          ],
+          [
+            "validation-0-Customer-06",
+            2
+          ],
+          [
+            "validation-0-Customer-07",
+            3
+          ],
+          [
+            "validation-0-Customer-08",
+            4
+          ],
+          [
+            "validation-0-Customer-09",
+            1
+          ],
+          [
+            "validation-0-Customer-10",
+            2
+          ],
+          [
+            "validation-0-Customer-11",
+            3
+          ],
+          [
+            "validation-0-Customer-12",
+            4
+          ],
+          [
+            "validation-0-Customer-13",
+            1
+          ],
+          [
+            "validation-0-Customer-14",
+            2
+          ],
+          [
+            "validation-0-Customer-15",
+            3
+          ],
+          [
+            "validation-0-Customer-16",
+            4
+          ]
+        ]
+      },
+      "source": "artifacts/qwen3-grpo-update-pilot/t034-v1/evaluation/rl/worker-0/trajectories/fd1efc8d-36fa-4e0e-84df-0a51e7a24f5a.json",
+      "source_sha256": "a5520dabda2a681ae365afe1b6be5c694748399491208512e7b79fc00641e047"
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "GRPO",
+      "task_id": "validation-0-top",
+      "prompt": "先查询 2023 年已支付订单数量（列 paid_orders），再列消费最高的前 3 名客户，返回 customer, revenue_cents，收入降序、客户名升序。",
+      "success": true,
+      "terminal_reason": "completed",
+      "score_reason": "success",
+      "verifier_components": {
+        "final_correct": true,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT COUNT(*) AS paid_orders FROM orders WHERE status='paid' AND ordered_at>='2023-01-01' AND ordered_at<'2024-01-01'",
+        "SELECT c.name AS customer,SUM(i.unit_price_cents*i.quantity) AS revenue_cents FROM orders o JOIN order_items i ON o.id=i.order_id JOIN customers c ON o.customer_id=c.id WHERE o.status='paid' AND o.ordered_at>='2023-01-01' AND o.ordered_at<'2024-01-01' GROUP BY c.id ORDER BY revenue_cents DESC,c.name ASC LIMIT 3"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "customer",
+          "revenue_cents"
+        ],
+        "rows": [
+          [
+            "validation-0-Customer-04",
+            2530700
+          ],
+          [
+            "validation-0-Customer-08",
+            2390100
+          ],
+          [
+            "validation-0-Customer-07",
+            2201600
+          ]
+        ]
+      },
+      "source": "artifacts/qwen3-grpo-update-pilot/t034-v1/evaluation/rl/worker-0/trajectories/c6ffd34d-fddc-4522-8893-eeeeaef0c7b4.json",
+      "source_sha256": "3c33fb180c284510c33fd34605ab1c6febd5de576ac177b510b7e88b60395881"
+    },
+    {
+      "model": "Qwen3-8B",
+      "stage": "GRPO",
+      "task_id": "validation-0-region",
+      "prompt": "统计 2023 年各区域已支付订单收入（分），返回 region, revenue_cents，按 region 排序。",
+      "success": false,
+      "terminal_reason": "completed",
+      "score_reason": "incorrect_result",
+      "verifier_components": {
+        "final_correct": false,
+        "business_constraints": true,
+        "business_probe_verified": true,
+        "schema_verified": true,
+        "recovery_verified": true,
+        "within_budget": true,
+        "sql_execution_rate": 1.0,
+        "tool_errors": 0.0,
+        "repeated_calls": 0.0,
+        "error_recovered": false,
+        "auxiliary": 0.0
+      },
+      "actions": [
+        "plan",
+        "schema",
+        "sql",
+        "check",
+        "finish"
+      ],
+      "sql_queries": [
+        "SELECT r.name AS region,SUM(i.quantity*i.unit_price_cents) AS revenue_cents FROM orders o JOIN order_items i ON o.id=i.order_id JOIN customers c ON o.customer_id=c.id JOIN regions r ON c.region_id=r.id WHERE o.status='已支付' AND o.ordered_at>='2023-01-01' AND o.ordered_at<'2024-01-01' GROUP BY r.name ORDER BY region"
+      ],
+      "tool_errors": [],
+      "final_answer": {
+        "columns": [
+          "region",
+          "revenue_cents"
+        ],
+        "rows": []
+      },
+      "source": "artifacts/qwen3-grpo-update-pilot/t034-v1/evaluation/rl/worker-0/trajectories/f9d2d063-bd85-4e79-b273-345e91e5d7d6.json",
+      "source_sha256": "7cf739f115f3efa78dfc17b6d816e3346ea60970b7ac1e8e7770e212684daa2f"
+    }
+  ]
+}

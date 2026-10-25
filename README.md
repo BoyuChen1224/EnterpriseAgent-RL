@@ -1,59 +1,101 @@
 # EnterpriseAgent-RL
 
-企业数据分析 Agent 后训练系统，覆盖 **多轮工具调用 → SQL 环境反馈 → 轨迹采集 → SFT → GRPO → 评测 → 模型 API**。
+[![CPU checks](https://github.com/BoyuChen1224/EnterpriseAgent-RL/actions/workflows/cpu.yml/badge.svg?branch=main)](https://github.com/BoyuChen1224/EnterpriseAgent-RL/actions/workflows/cpu.yml)
 
-## 实现内容
+一个面向企业数据分析的 Agent 后训练项目。模型通过工具查询 SQLite，保留每轮交互，再用这些轨迹做 LoRA SFT 和 GRPO。
 
-- **Agent Runtime**：规划、Schema/Dictionary 查询、只读 SQL、结果检查和有界多轮交互。
-- **数据与评测**：版本化轨迹、train-only 监督数据、独立业务 Verifier，以及 Base/SFT/RL 配对评测。
-- **后训练**：LoRA SFT、真实环境 GRPO rollout、token/logprob/mask 对齐、策略更新和 checkpoint 恢复。
-- **模型服务**：FastAPI 任务提交、状态与轨迹查询；固定 SFT 模型身份、进程生命周期和退出清理。
+实现包括多轮 Runtime、只读 SQL、独立业务评分、轨迹回放、训练和本地 API。Qwen3-8B 已在 V100 32GB 上完成 SFT、GRPO 更新和重载，使用 FP16、SDPA math，关闭 thinking。
 
-当前主线模型为 **Qwen3-8B**，已在单张 V100 32GB 上验证 LoRA SFT、GRPO 更新与模型重载，使用 **FP16 + SDPA math，关闭 thinking**。保留 Qwen2.5-1.5B-Instruct 的历史实现与实验。
+## Base / SFT / GRPO 对比
 
-## 实验结果
+每项实验评测 20 个 validation 任务。成功要求答案正确、满足业务约束，并在预算内完成。
 
-Qwen3-8B 在固定的 20 个 validation 任务上完成 Base/SFT 与 SFT/RL 两组配对评测；每臂均 20/20 正式评分，technical unknown=0：
+| 模型 | Base | SFT | SFT + GRPO | GRPO 相对 SFT |
+| --- | ---: | ---: | ---: | ---: |
+| **Qwen3-8B** | 0/20 · 0% | **13/20 · 65%** | **13/20 · 65%** | 0 |
+| **Qwen2.5-1.5B-Instruct** | 0/20 · 0% | **8/20 · 40%** | **8/20 · 40%** | 0 |
 
-| 模型 | 业务成功 | 成功率 |
-| --- | ---: | ---: |
-| Qwen3-8B Base | 0/20 | 0% |
-| Runtime 对齐 SFT | 13/20 | 65% |
-| SFT + GRPO delta | 13/20 | 65% |
+Base 指未加载本项目 Adapter 的模型。两套实验使用相同的 20 个任务，但训练配方、依赖和评测实现版本不同；这张表展示已完成结果，不把差值单独归因于模型大小。Qwen3 的 Base/SFT 和 SFT/GRPO 分别做了配对评测，所有任务均已评分。
 
-SFT 使用 **54 条 train-only 逐决策监督记录、27 次 LoRA 更新**，相对 Base 提升 **65 个百分点**。GRPO 从 16 条真实多轮 episode 中获得 2/4 个有奖励差异的任务组，复用固定批次完成 **2 次真实策略更新**；本轮未带来额外业务收益，20 个任务均无成功/失败变化。
+Qwen3 SFT 使用 54 条逐决策样本、27 次更新。GRPO 从 16 条 episode 中采到两个有奖励差异的任务组，复用固定批次做了两次更新，业务成功率没有继续提高。数据是小规模合成库，共享 schema 和部分模板；尚未运行真实模型 test。
 
-结果来自单 seed、两个合成数据库实例和共享 schema/template 的小面板，test 未运行。历史 1.5B 面板为 Base 0/20、SFT 8/20、RL 8/20；两套模型实验的配方和协议不同，不将其差值归因于模型规模。模型、数据库和原始运行产物不随源码发布。
+## 真实任务示例
 
-## CPU 快速开始
+以下摘自已保存的模型轨迹，没有重新生成回答。完整逐模板结果和 SQL 见 [结果说明](docs/results.md)，18 条示例摘要见 [JSON](docs/examples/model-comparison.json)。
 
-Python 3.12；从仓库根目录执行：
+### 客户消费 Top-3
 
-```bash
+> 先查询 2023 年已支付订单数量（列 paid_orders），再列消费最高的前 3 名客户，返回 customer, revenue_cents，收入降序、客户名升序。
+
+| 模型 | Base | SFT | SFT + GRPO |
+| --- | --- | --- | --- |
+| Qwen3-8B | 使用不存在的字段，耗尽工具预算 | **成功：先计数，再查询 Top-3** | **成功：与 SFT 相同** |
+| Qwen2.5-1.5B-Instruct | 重复查询不存在的 `customer` 列 | 排名正确，但漏掉订单数查询，业务失败 | 同 SFT，仍未满足业务要求 |
+
+Qwen3 SFT 的两次 SQL 查询如下：
+
+~~~sql
+SELECT COUNT(*) AS paid_orders
+FROM orders
+WHERE status='paid'
+  AND ordered_at>='2023-01-01' AND ordered_at<'2024-01-01';
+
+SELECT c.name AS customer,
+       SUM(i.unit_price_cents*i.quantity) AS revenue_cents
+FROM orders o
+JOIN order_items i ON o.id=i.order_id
+JOIN customers c ON o.customer_id=c.id
+WHERE o.status='paid'
+  AND o.ordered_at>='2023-01-01' AND o.ordered_at<'2024-01-01'
+GROUP BY c.id
+ORDER BY revenue_cents DESC,c.name ASC
+LIMIT 3;
+~~~
+
+返回结果，金额单位为分：
+
+| customer | revenue_cents |
+| --- | ---: |
+| validation-0-Customer-04 | 2530700 |
+| validation-0-Customer-08 | 2390100 |
+| validation-0-Customer-07 | 2201600 |
+
+### 区域收入
+
+> 统计 2023 年各区域已支付订单收入（分），返回 region, revenue_cents，按 region 排序。
+
+| 模型 | Base | SFT | SFT + GRPO |
+| --- | --- | --- | --- |
+| Qwen3-8B | 错误字段，耗尽动作预算 | `status='已支付'`，查询为空，业务失败 | 同 SFT，仍失败 |
+| Qwen2.5-1.5B-Instruct | 错误字段，耗尽工具预算 | **成功：使用 `status='paid'`，返回四个区域** | **成功：与 SFT 相同** |
+
+8B 的整体成绩更高，但这个任务仍输给 1.5B。两套模型的 GRPO 都没有修正各自 SFT 的这些失败。
+
+## 快速开始
+
+CPU smoke 使用临时数据库和确定性策略，检查工具、评分、轨迹回放及 API：
+
+~~~bash
 git clone --branch main https://github.com/BoyuChen1224/EnterpriseAgent-RL.git
 cd EnterpriseAgent-RL
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements/cpu-py312-linux.lock
 .venv/bin/python -m pip install --no-build-isolation --no-deps -e .
-PYTHONPATH=src .venv/bin/python scripts/evaluation/cpu_smoke.py
-```
+.venv/bin/python scripts/evaluation/cpu_smoke.py
+~~~
 
-该 smoke 使用临时 SQLite 和确定性 Policy，检查执行、轨迹重放与 API，不加载模型，也不代表 LLM 能力。
+完整 CPU 测试另装 `requirements/cpu-training-py312-linux.lock`。GPU 运行需要模型、Adapter 和数据，步骤见 [Qwen3 训练指南](docs/qwen3-post-training.md)。
 
-## 运行入口
+## 文档与入口
 
-| 功能 | 入口 |
-| --- | --- |
-| Agent / 评测 / API CLI | `python -m enterprise_agent_rl.cli --help` |
-| Qwen3 Runtime 对齐 SFT | `scripts/training/run_qwen3_sft.py` |
-| Qwen3 Base/SFT 冻结面板 | `scripts/evaluation/run_qwen3_runtime_panel.py` |
-| Qwen3 分组 rollout | `scripts/evaluation/run_qwen3_grpo_rollout.py` |
-| Qwen3 固定批次 GRPO / 重载 / 对照 | `scripts/training/run_qwen3_grpo_pilot.py` |
-| 历史 1.5B 在线 GRPO / 冻结评测 | `scripts/training/run_grpo.py` |
-| 本地模型与 Agent API（1.5B profile） | `scripts/serving/run_sft_n_api.py` |
+| 内容 | 文档 | 主要入口 |
+| --- | --- | --- |
+| 模块与数据流 | [架构](docs/architecture.md) | `src/enterprise_agent_rl/` |
+| 两套模型的实验结果 | [结果](docs/results.md) | `docs/examples/model-comparison.json` |
+| SFT、重载、冻结评测 | [Qwen3 训练](docs/qwen3-post-training.md) | `scripts/training/run_qwen3_sft.py` |
+| rollout 与策略更新 | [GRPO](docs/grpo-training.md) | `scripts/training/run_qwen3_grpo_pilot.py` |
+| 本地模型与任务 API | [服务](docs/model-serving.md) | `scripts/serving/run_sft_n_api.py` |
+| 环境、测试和资产 | [复现](docs/reproducibility.md) | `requirements/` |
+| 后续工作 | [路线图](docs/roadmap.md) | — |
 
-GPU 环境使用 `requirements/qwen3-py312-linux.lock`；入口参数、Slurm 示例和固定资产依赖见 [Qwen3 后训练指南](docs/qwen3-post-training.md)。源码统一维护在 `main`，模型、Adapter、数据库、checkpoint、原始产物和协作提示词保留在本地，不随源码提交。
-
-## 技术文档
-
-[Qwen3 后训练](docs/qwen3-post-training.md) · [系统架构](docs/architecture.md) · [GRPO 训练与评测](docs/grpo-training.md) · [模型服务](docs/model-serving.md) · [复现与资产说明](docs/reproducibility.md) · [路线图](docs/roadmap.md)
+源码统一维护在 `main`。模型、数据库、checkpoint 和原始运行日志保存在本地，不随仓库提交。
