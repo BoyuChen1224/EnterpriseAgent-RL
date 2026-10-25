@@ -359,7 +359,23 @@ def _build_panel(
             task.reference_sql,
             context={"control": "reference_sql", "task_id": task_id},
         )
+        _append_control_call(
+            paths["run"],
+            {
+                "control_type": "reference_sql",
+                "task_id": task_id,
+                "result_sha256": _sha(reference_result),
+            },
+        )
         expected_rows = python_oracle(database, template, "train", instance)
+        _append_control_call(
+            paths["run"],
+            {
+                "control_type": "python_oracle",
+                "task_id": task_id,
+                "result_sha256": _sha(expected_rows),
+            },
+        )
         expected = {"columns": reference_result.get("columns"), "rows": expected_rows}
         oracle_sha = _sha(expected)
         declared_oracle = next(
@@ -412,6 +428,96 @@ def _build_panel(
                 "policy_messages_read_reference_sql": False,
             }
         )
+    return public_rows, private_rows, control_rows
+
+
+def _control_ledger_path(run_dir: Path) -> Path:
+    return run_dir / "panel" / "private" / "cpu-control-calls.jsonl"
+
+
+def _append_control_call(run_dir: Path, record: dict[str, Any]) -> None:
+    """Persist one completed CPU control; no count is inferred from panels."""
+
+    _append_jsonl(
+        _control_ledger_path(run_dir),
+        {
+            "schema_version": "t034-control-call-v1",
+            "recorded_at_utc": _now(),
+            **record,
+        },
+    )
+
+
+def _control_counts(run_dir: Path) -> dict[str, int]:
+    ledger = _control_ledger_path(run_dir)
+    if not ledger.is_file():
+        raise RolloutSignalError("cpu_control_append_ledger_missing")
+    rows = read_jsonl(ledger)
+    counts = defaultdict(int)
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        control_type = row.get("control_type")
+        task_id = row.get("task_id")
+        if control_type not in {"reference_sql", "python_oracle"} or not isinstance(task_id, str):
+            raise RolloutSignalError("cpu_control_append_ledger_invalid")
+        key = (str(control_type), task_id)
+        if key in seen:
+            raise RolloutSignalError(f"cpu_control_duplicate:{control_type}:{task_id}")
+        seen.add(key)
+        counts[str(control_type)] += 1
+    return {
+        "reference_sql": int(counts["reference_sql"]),
+        "python_oracle": int(counts["python_oracle"]),
+        "total": int(sum(counts.values())),
+    }
+
+
+def _load_frozen_panel(
+    paths: dict[str, Path], panel: dict[str, Any]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]] | None:
+    """Reuse all three immutable panel files without executing controls again."""
+
+    panel_root = paths["run"] / "panel"
+    public_path = panel_root / "public-panel.jsonl"
+    private_path = panel_root / "private" / "verifier-inputs.jsonl"
+    control_path = panel_root / "private" / "cpu-controls.jsonl"
+    present = [path.is_file() for path in (public_path, private_path, control_path)]
+    if not any(present):
+        return None
+    if not all(present):
+        raise RolloutSignalError("partial_frozen_panel_requires_recovery")
+    public_rows = read_jsonl(public_path)
+    private_rows = read_jsonl(private_path)
+    control_rows = read_jsonl(control_path)
+    if [row.get("task_id") for row in public_rows] != list(TASK_IDS):
+        raise RolloutSignalError("frozen_public_panel_order_changed")
+    if [row.get("task_id") for row in private_rows] != list(TASK_IDS):
+        raise RolloutSignalError("frozen_private_panel_order_changed")
+    if [row.get("task_id") for row in control_rows] != list(TASK_IDS):
+        raise RolloutSignalError("frozen_control_panel_order_changed")
+    selected_panel = {row["task_id"]: row for row in panel["tasks"]}
+    for public, private, control in zip(public_rows, private_rows, control_rows, strict=True):
+        task_id = public.get("task_id")
+        if private.get("task_id") != task_id or control.get("task_id") != task_id:
+            raise RolloutSignalError(f"frozen_panel_task_binding_changed:{task_id}")
+        instance, template = TASK_ORDER[TASK_IDS.index(task_id)]
+        task = _selected_task(instance, template)
+        declared = selected_panel.get(task_id)
+        if declared is None or public.get("public_task") != task.public.model_dump():
+            raise RolloutSignalError(f"frozen_public_task_changed:{task_id}")
+        reference_hash = hashlib.sha256(task.reference_sql.encode()).hexdigest()
+        if private.get("reference_sql_sha256") != reference_hash:
+            raise RolloutSignalError(f"frozen_reference_sql_hash_changed:{task_id}")
+        if control.get("reference_sql_sha256") != reference_hash:
+            raise RolloutSignalError(f"frozen_control_reference_hash_changed:{task_id}")
+        declared_oracle = next(
+            row for row in panel["oracle_checks"] if row.get("task_id") == task_id
+        )
+        if control.get("oracle_sha256") != declared_oracle.get("oracle_sha256"):
+            raise RolloutSignalError(f"frozen_oracle_hash_changed:{task_id}")
+        if control.get("policy_messages_read_reference_sql") is not False:
+            raise RolloutSignalError(f"frozen_control_policy_leak:{task_id}")
+    _control_counts(paths["run"])
     return public_rows, private_rows, control_rows
 
 
@@ -622,7 +728,11 @@ def _prepare(paths: dict[str, Path]) -> dict[str, Any]:
         raise RolloutSignalError("config_model_identity_mismatch")
     tokenizer_preflight = _cpu_tokenizer_preflight(paths, context, config)
     databases = _copy_frozen_databases(paths, panel, paths["run"])
-    public_rows, private_rows, control_rows = _build_panel(paths, panel, config)
+    frozen = _load_frozen_panel(paths, panel)
+    if frozen is None:
+        public_rows, private_rows, control_rows = _build_panel(paths, panel, config)
+    else:
+        public_rows, private_rows, control_rows = frozen
     panel_root = paths["run"] / "panel"
     private_root = panel_root / "private"
     panel_root.mkdir(parents=True, exist_ok=True)
@@ -658,6 +768,7 @@ def _prepare(paths: dict[str, Path]) -> dict[str, Any]:
     )
     _write_json(paths["run"] / "environment.json", environment)
     cache_manifest = paths["cache"] / "qwen-cache-manifest.json"
+    control_calls = _control_counts(paths["run"])
     input_manifest = {
         "schema_version": "t033-input-manifest-v1",
         "task": "T-033/E-030",
@@ -705,10 +816,8 @@ def _prepare(paths: dict[str, Path]) -> dict[str, Any]:
         "validation_split_accessed": False,
         "test_split_accessed": False,
         "cpu_control_calls": {
-            "reference_sql": len(control_rows),
-            "python_oracle": len(control_rows),
-            "total": len(control_rows) * 2,
-            "budget": 8,
+            **control_calls,
+            "accounting": "append-only cpu-control-calls.jsonl",
         },
         "source_snapshot": source_snapshot,
     }
@@ -783,7 +892,11 @@ def _prepare(paths: dict[str, Path]) -> dict[str, Any]:
             {"name": "selected_tasks", "status": "PASS", "observed": list(TASK_IDS)},
             {"name": "database_physical_and_logical_hashes", "status": "PASS"},
             {"name": "database_readonly_copies", "status": "PASS"},
-            {"name": "reference_sql_python_oracle_controls", "status": "PASS", "count": 8},
+            {
+                "name": "reference_sql_python_oracle_controls",
+                "status": "PASS",
+                "observed": control_calls,
+            },
             {"name": "model_load_performed", "status": "PASS", "observed": False},
             {
                 "name": "tokenizer_hard_off_context_preflight",
@@ -807,7 +920,7 @@ def _prepare(paths: dict[str, Path]) -> dict[str, Any]:
         "samples_per_task": 4,
         "task_order": list(TASK_IDS),
         "schedule_sha256": _sha(schedule),
-        "cpu_control_calls": 8,
+        "cpu_control_calls": control_calls,
         "model_load_count": 0,
         "tokenizer_load_count": 1,
         "model_weights_load_count": 0,
@@ -1501,6 +1614,7 @@ def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
     evidence = evidence_journal_summary(paths["run"])
     budget_state = read_json(paths["run"] / "budget-state.json", {}) or {}
     counters = dict(budget_state.get("call_counters") or {})
+    control_calls = _control_counts(paths["run"])
     group_metrics = _group_metrics(schedule, scores)
     complete = (
         len(episodes) == 16
@@ -1646,7 +1760,7 @@ def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
         "runtime_worker_calls": counters.get("runtime_workers", 0),
         "verifier_calls": counters.get("verifier_calls", 0),
         "verifier_sql_calls": counters.get("verifier_sql", 0),
-        "cpu_control_calls": 8,
+        "cpu_control_calls": control_calls,
         "training_calls": training_calls,
         "evidence": evidence,
         "token_contract": token_check,
@@ -1712,7 +1826,9 @@ def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
                 f"Runtime tool attempts：`{counters.get('tool_actions', 0)}`；"
                 f"Verifier：`{counters.get('verifier_calls', 0)}`；"
                 f"Verifier SQL：`{counters.get('verifier_sql', 0)}`；"
-                "CPU reference/Python controls：`4+4=8`。"
+                f"CPU reference/Python controls：`{control_calls['reference_sql']}+"
+                f"{control_calls['python_oracle']}={control_calls['total']}`，"
+                "由 append-only 控制账本派生。"
             ),
             (
                 f"- 训练调用：backward `{training_calls.get('backward', 0)}`、"

@@ -1,0 +1,126 @@
+# T-034/E-031. Fixed-batch Qwen3 GRPO update pilot.
+# This is a separate explicit contract; it must not be routed through the
+# historical Qwen2.5/1.5B online configuration.
+
+[model]
+model_id = "Qwen/Qwen3-8B"
+revision = "b968826d9c46dd6066d109eabc6255188de91218"
+dtype = "float16"
+attention_backend = "sdpa_math"
+max_context_tokens = 4096
+enable_thinking = false
+cache_dir = "artifacts/model-cache-qwen3-8b"
+parent_adapter = "artifacts/qwen3-runtime-sft-comparison/t032-v1/training/final-adapter"
+parent_adapter_sha256 = "413d1b0211ba93b2df322dcdaeb1fa1c3f019210c8ded510a2920e5ad6e114e9"
+parent_adapter_config_sha256 = "560d44e512b9745703519005087804dbcf6b819e2b6e1694d33571f9e346ed37"
+
+[lora]
+rank = 8
+alpha = 16.0
+dropout = 0.0
+module_count = 252
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+
+[rollout]
+rounds = 1
+updates = 2
+samples_per_group = 4
+group_count = 4
+generation_enabled = false
+
+[runtime]
+seed = 17
+max_actions = 20
+max_tool_calls = 14
+episode_timeout_s = 600
+inference_timeout_s = 120
+sql_timeout_s = 2
+sql_max_rows = 100
+sql_max_bytes = 65536
+sql_memory_mb = 256
+step_penalty = 0.0
+repeat_penalty = 0.0
+error_penalty = 0.0
+recovery_bonus = 0.0
+
+[optimizer]
+learning_rate = 0.000002
+betas = [0.9, 0.999]
+eps = 0.00000001
+weight_decay = 0.0
+foreach = false
+fused = false
+clip_norm = 1.0
+epsilon = 0.2
+beta = 0.0
+grad_scaler_init = 1024.0
+grad_scaler_backoff = 0.5
+grad_scaler_growth_interval = 1000
+max_amp_skip_replays = 2
+checkpoint_use_reentrant = true
+enable_input_require_grads = true
+
+[training]
+seed = 42
+microbatch = 1
+successful_logical_updates = 2
+total_token_denominator = 4745
+input_max_sequence_tokens = 3519
+
+[budget]
+run_hard_seconds = 10800
+job_hard_seconds = 3600
+soft_seconds = 3480
+cleanup_reserve_seconds = 120
+gpu_count = 1
+
+[data]
+source_run = "artifacts/qwen3-grpo-rollout-signal/t033-v1"
+token_rollouts = "artifacts/qwen3-grpo-rollout-signal/t033-v1/token-rollouts.jsonl"
+group_metrics = "artifacts/qwen3-grpo-rollout-signal/t033-v1/group-metrics.json"
+case_results = "artifacts/qwen3-grpo-rollout-signal/t033-v1/case-results.jsonl"
+artifact_manifest = "artifacts/qwen3-grpo-rollout-signal/t033-v1/artifact-manifest.json"
+artifact_manifest_sha256 = "e0c533b2c9af0bca5fa276001cd8fdc3bd4b41af200d977901db67edc59fc9ad"
+token_rollouts_sha256 = "ef63742a1150b9af4dd6a1fd9414ec74bdd5568e49614d568cb23b68ce59b3ad"
+group_metrics_sha256 = "a8e5cc5aca30a891c7965a2dba47b51a0b1092cec628e7e1b9b3cfa8ea8b396a"
+case_results_sha256 = "2ca0b9cc2a06e36e99fbaad46f30b6c2b3e9471441fd71b08dc4208ae41ee97b"
+
+[evaluation]
+validation_source_run = "artifacts/qwen3-runtime-sft-comparison/t032-v1/evaluation/validation"
+validation_manifest = "artifacts/qwen3-runtime-sft-comparison/t032-v1/evaluation/validation/validation-manifest.json"
+validation_manifest_sha256 = "056777038235f49cd1f553879ddfd5ebe8379f77e18a8da46804f9dc28e47c2a"
+validation_public_panel = "artifacts/qwen3-runtime-sft-comparison/t032-v1/evaluation/validation/public-panel.jsonl"
+validation_private = "artifacts/qwen3-runtime-sft-comparison/t032-v1/evaluation/validation/private/verifier-inputs.jsonl"
+
+[evaluation.generation]
+temperature = 0.0
+top_p = 1.0
+top_k = 0
+max_tokens = 512
+format_retries = 1
+parse_mode = "json_fence"
+seed = 17
+enable_thinking = false
+
+[slurm]
+account = "pi_daipeishan"
+qos = "gpuq"
+partitions = ["gpu2Q", "gpu4Q", "gpu4RQ", "gpu8Q"]
+gpus = 1
+cpus_per_task = 4
+memory_gb = 64
+time_minutes = 60
+cleanup_reserve_seconds = 120
+gpu_budget_minutes = 180
+
+[limits]
+forward_backward = 420
+optimizer_update_attempts = 6
+successful_optimizer_updates = 4
+amp_skip_replays = 2
+reload_forward = 8
+model_requests = 1600
+tool_actions = 600
+runtime_workers = 600
+verifier_calls = 48
+verifier_sql = 96

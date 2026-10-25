@@ -466,27 +466,46 @@ def run_worker(
     endpoint: str,
     engine_dir: Path,
     adapter: Path | None,
+    parent_adapter: Path | None,
     worker_index: int,
     worker_count: int,
     model_config: Path = MODEL_DEFAULT,
     agent_config: Path = AGENT_DEFAULT,
 ) -> int:
-    if arm not in {"base", "sft"}:
+    if arm not in {"base", "sft", "rl"}:
         raise PanelError("invalid_arm")
     if not os.environ.get("SLURM_JOB_ID"):
         raise PanelError("qwen3_panel_requires_slurm_job")
     manifest = json.loads(
         (output / "evaluation" / "validation" / "validation-manifest.json").read_text()
     )
-    private = _load_private(Path(manifest["private_verifier_path"]))
+    local_private = output / "evaluation" / "validation" / "private" / "verifier-inputs.jsonl"
+    declared_private = Path(manifest["private_verifier_path"])
+    local_private_sha = (
+        hashlib.sha256(local_private.read_bytes()).hexdigest() if local_private.is_file() else None
+    )
+    if local_private_sha == manifest.get("private_verifier_sha256"):
+        private_path = local_private
+    else:
+        private_path = declared_private
+    private = _load_private(private_path)
     settings = Settings.load(agent_config)
     model = ModelSettings.load(model_config)
     if model.generation.enable_thinking is not False:
         raise PanelError("qwen3_panel_requires_hard_thinking_off")
     if arm == "base" and adapter is not None:
         raise PanelError("base_arm_must_not_load_adapter")
-    if arm == "sft" and adapter is None:
+    if arm == "base" and parent_adapter is not None:
+        raise PanelError("base_arm_must_not_load_parent_adapter")
+    if arm == "sft" and (adapter is None or parent_adapter is not None):
         raise PanelError("sft_arm_requires_final_adapter")
+    if arm == "rl" and (adapter is None or parent_adapter is None):
+        raise PanelError("rl_arm_requires_parent_and_delta_adapters")
+    model_version = {
+        "base": "qwen3-base-frozen-v1",
+        "sft": "qwen3-sft-frozen-v1",
+        "rl": "qwen3-sft-plus-t034-delta-step2-v1",
+    }[arm]
     arm_root = output / "evaluation" / arm
     worker_root = arm_root / f"worker-{worker_index}"
     trajectory_store = TrajectoryStore(worker_root / "trajectories")
@@ -498,12 +517,14 @@ def run_worker(
         {
             "schema_version": "1.0",
             "arm": arm,
-            "model_version": "qwen3-base-frozen-v1" if arm == "base" else "qwen3-sft-step27",
+            "model_version": model_version,
             "worker_index": worker_index,
             "worker_count": worker_count,
             "endpoint": endpoint,
             "engine_dir": str(engine_dir.resolve()),
             "adapter": str(adapter.resolve()) if adapter else None,
+            "parent_adapter": str(parent_adapter.resolve()) if parent_adapter else None,
+            "validation_private_path": str(private_path.resolve()),
             "cwd": str(Path.cwd()),
             "python": sys.executable,
             "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
@@ -523,7 +544,7 @@ def run_worker(
     policy = LocalModelPolicy(
         endpoint,
         model.model_id,
-        "qwen3-base-frozen-v1" if arm == "base" else "qwen3-sft-step27",
+        model_version,
         model.generation,
     )
     selected = [
@@ -853,7 +874,11 @@ def merge_arm(output: Path, *, arm: str, agent_config: Path = AGENT_DEFAULT) -> 
         "schema_version": "1.0",
         "status": status,
         "arm": arm,
-        "model_version": "qwen3-base-frozen-v1" if arm == "base" else "qwen3-sft-step27",
+        "model_version": {
+            "base": "qwen3-base-frozen-v1",
+            "sft": "qwen3-sft-frozen-v1",
+            "rl": "qwen3-sft-plus-t034-delta-step2-v1",
+        }[arm],
         "counts": counts,
         "planned_denominator": 20,
         "business_success_rate": counts["successes"] / 20
@@ -1128,12 +1153,13 @@ def main() -> int:
     parser.add_argument("--prepare", action="store_true")
     parser.add_argument("--merge", action="store_true")
     parser.add_argument("--compare", action="store_true")
-    parser.add_argument("--arm", choices=("base", "sft"))
+    parser.add_argument("--arm", choices=("base", "sft", "rl"))
     parser.add_argument("--worker-index", type=int)
     parser.add_argument("--worker-count", type=int, default=1)
     parser.add_argument("--endpoint")
     parser.add_argument("--engine-dir", type=Path)
     parser.add_argument("--adapter", type=Path)
+    parser.add_argument("--parent-adapter", type=Path)
     parser.add_argument("--model-config", type=Path, default=MODEL_DEFAULT)
     parser.add_argument("--agent-config", type=Path, default=AGENT_DEFAULT)
     args = parser.parse_args()
@@ -1169,6 +1195,7 @@ def main() -> int:
         endpoint=args.endpoint,
         engine_dir=args.engine_dir,
         adapter=args.adapter,
+        parent_adapter=args.parent_adapter,
         worker_index=args.worker_index,
         worker_count=args.worker_count,
         model_config=args.model_config,

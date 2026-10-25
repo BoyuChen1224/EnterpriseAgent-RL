@@ -131,7 +131,16 @@ class QwenPolicy:
         self.forward_backward_count = 0
 
     @classmethod
-    def load(cls, context: RunContext, config: GrpoConfig, guard: BudgetGuard) -> QwenPolicy:
+    def _load_train_impl(
+        cls,
+        context: RunContext,
+        config: GrpoConfig,
+        guard: BudgetGuard,
+        *,
+        expected_model_id: str,
+        expected_revision: str,
+        expected_module_count: int,
+    ) -> QwenPolicy:
         torch = _torch()
         if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
             raise RuntimeError("real_grpo_requires_one_visible_cuda_device")
@@ -144,11 +153,18 @@ class QwenPolicy:
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
         torch.backends.cudnn.benchmark = False
-        seed_everything(int(config.raw.get("run", {}).get("training_seed", 42)))
+        training_values = config.raw.get("training", {})
+        run_values = config.raw.get("run", {})
+        seed_everything(int(training_values.get("seed", run_values.get("training_seed", 42))))
         guard.check("setup:model-load")
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         model_cfg = config.model
+        if (
+            str(model_cfg.get("model_id")) != expected_model_id
+            or str(model_cfg.get("revision")) != expected_revision
+        ):
+            raise RuntimeError("training_model_identity_mismatch")
         cache_dir = Path(str(model_cfg["cache_dir"]))
         if not cache_dir.is_absolute():
             cache_dir = context.repo_root / cache_dir
@@ -206,11 +222,18 @@ class QwenPolicy:
         )
         guard.check("setup:trainable-delta-injected")
         trainable = trainable_lora_parameters(model)
-        if len(module_names) != 196:
-            raise RuntimeError(f"unexpected_qwen_lora_module_count:{len(module_names)}")
+        if len(module_names) != expected_module_count:
+            raise RuntimeError(
+                f"unexpected_qwen_lora_module_count:{len(module_names)}:{expected_module_count}"
+            )
         model.config.use_cache = False
-        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": True})
-        model.enable_input_require_grads()
+        model.gradient_checkpointing_enable(
+            gradient_checkpointing_kwargs={
+                "use_reentrant": bool(config.optimizer.get("checkpoint_use_reentrant", True))
+            }
+        )
+        if bool(config.optimizer.get("enable_input_require_grads", True)):
+            model.enable_input_require_grads()
         model.train()
         optimizer = torch.optim.AdamW(
             trainable,
@@ -241,6 +264,58 @@ class QwenPolicy:
             module_names=module_names,
             parent_merge=parent_merge,
             device=torch.device("cuda:0"),
+        )
+
+    @classmethod
+    def load(cls, context: RunContext, config: GrpoConfig, guard: BudgetGuard) -> QwenPolicy:
+        """Historical Qwen2.5/1.5B online loader; its contract stays unchanged."""
+
+        from .config import MODEL_ID, MODEL_REVISION
+
+        return cls._load_train_impl(
+            context,
+            config,
+            guard,
+            expected_model_id=MODEL_ID,
+            expected_revision=MODEL_REVISION,
+            expected_module_count=196,
+        )
+
+    @classmethod
+    def load_qwen3_update(
+        cls, context: RunContext, config: GrpoConfig, guard: BudgetGuard
+    ) -> QwenPolicy:
+        """Explicit T-034 Qwen3 fixed-batch training loader.
+
+        This is deliberately separate from :meth:`load`: the legacy online
+        loader remains bound to its historical 1.5B/196-module contract.
+        """
+
+        from .qwen3_rollout import (
+            QWEN3_MODEL_ID,
+            QWEN3_MODULE_COUNT,
+            QWEN3_REVISION,
+        )
+
+        if int(config.lora.get("module_count", -1)) != QWEN3_MODULE_COUNT:
+            raise RuntimeError("qwen3_update_module_count_contract_mismatch")
+        if tuple(config.lora.get("target_modules", ())) != (
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ):
+            raise RuntimeError("qwen3_update_target_module_contract_mismatch")
+        return cls._load_train_impl(
+            context,
+            config,
+            guard,
+            expected_model_id=QWEN3_MODEL_ID,
+            expected_revision=QWEN3_REVISION,
+            expected_module_count=QWEN3_MODULE_COUNT,
         )
 
     @classmethod
@@ -422,6 +497,40 @@ class QwenPolicy:
         policy.model_ref_id = f"{config.model['model_id']}@{config.model['revision']}@{arm}"
         return policy
 
+    @classmethod
+    def load_qwen3_update_evaluation(
+        cls,
+        context: RunContext,
+        config: GrpoConfig,
+        guard: BudgetGuard,
+        *,
+        arm: str,
+    ) -> QwenPolicy:
+        """Explicit T-034 fresh Base→parent→delta evaluation loader."""
+
+        from .qwen3_rollout import QWEN3_MODEL_ID, QWEN3_MODULE_COUNT, QWEN3_REVISION
+
+        if str(config.model.get("model_id")) != QWEN3_MODEL_ID:
+            raise RuntimeError("qwen3_update_evaluation_model_mismatch")
+        if str(config.model.get("revision")) != QWEN3_REVISION:
+            raise RuntimeError("qwen3_update_evaluation_revision_mismatch")
+        if arm == "RL" and not config.evaluation.get("rl_delta_adapter"):
+            raise RuntimeError("qwen3_update_evaluation_delta_missing")
+        policy = cls.load_evaluation(context, config, guard, arm=arm)
+        if arm == "RL":
+            parent_merge = policy.parent_merge
+            if int(parent_merge.get("parent_merge_count", 0)) != 1:
+                raise RuntimeError("qwen3_update_evaluation_parent_merge_count_mismatch")
+            if int(parent_merge.get("delta_merge_count", 0)) != 1:
+                raise RuntimeError("qwen3_update_evaluation_delta_merge_count_mismatch")
+        if arm in {"N", "RL"} and policy.parent_merge.get("parent"):
+            if int(policy.parent_merge["parent"].get("module_count", 0)) != QWEN3_MODULE_COUNT:
+                raise RuntimeError("qwen3_update_evaluation_parent_module_count_mismatch")
+        if arm == "RL" and policy.parent_merge.get("delta"):
+            if int(policy.parent_merge["delta"].get("module_count", 0)) != QWEN3_MODULE_COUNT:
+                raise RuntimeError("qwen3_update_evaluation_delta_module_count_mismatch")
+        return policy
+
     def _adapter_state(self) -> dict[str, Any]:
         from enterprise_agent_rl.lora import adapter_state_dict
 
@@ -478,6 +587,16 @@ class QwenPolicy:
             "rng": recursive_fingerprint(capture_rng_state()),
         }
 
+    def frozen_base_fingerprint(self) -> str:
+        """Fingerprint every non-LoRA parameter after parent merge."""
+
+        state = {
+            name: value.detach().cpu()
+            for name, value in self.model.named_parameters()
+            if name.rsplit(".", 1)[-1] not in {"lora_A", "lora_B"}
+        }
+        return _digest_tensor_state(state)
+
     def _inputs(self, record: dict[str, Any]) -> dict[str, Any]:
         torch = _torch()
         prompt = torch.tensor([record["prompt_token_ids"]], dtype=torch.long, device=self.device)
@@ -486,11 +605,21 @@ class QwenPolicy:
         )
         if completion.size(1) == 0:
             raise ValueError(f"empty_completion:{record.get('episode_id')}")
+        max_context = int(self.config.model.get("max_context_tokens", 0))
+        if max_context and prompt.size(1) + completion.size(1) > max_context:
+            raise ValueError(f"context_length_exceeded:{record.get('episode_id')}")
+        raw_mask = record.get("completion_mask")
+        if raw_mask is None:
+            raw_mask = [1] * completion.size(1)
+        if not isinstance(raw_mask, list) or len(raw_mask) != completion.size(1):
+            raise ValueError(f"completion_mask_length_mismatch:{record.get('episode_id')}")
+        if any(value not in (0, 1) for value in raw_mask) or not any(raw_mask):
+            raise ValueError(f"completion_mask_invalid:{record.get('episode_id')}")
         return {
             "prompt_ids": prompt,
             "prompt_mask": torch.ones_like(prompt),
             "completion_ids": completion,
-            "completion_mask": torch.ones_like(completion, dtype=torch.float32),
+            "completion_mask": torch.tensor([raw_mask], dtype=torch.float32, device=self.device),
             "old_per_token_logps": torch.tensor(
                 [record["old_per_token_logps"]], dtype=torch.float32, device=self.device
             ),
@@ -503,15 +632,23 @@ class QwenPolicy:
         self, records: list[dict[str, Any]], *, logical_step: int, total_tokens: int
     ) -> dict[str, Any]:
         torch = _torch()
-        active = [row for row in records if float(row.get("advantage", 0.0)) != 0.0]
+        if total_tokens <= 0:
+            raise ValueError("total_tokens_must_be_positive")
+        for row in records:
+            advantage = row.get("advantage")
+            if (
+                not isinstance(advantage, int | float)
+                or isinstance(advantage, bool)
+                or not math.isfinite(float(advantage))
+            ):
+                raise ValueError(f"advantage_invalid:{row.get('episode_id')}")
+        active = [row for row in records if float(row["advantage"]) != 0.0]
         if not active:
             return {
                 "status": "SKIPPED_ZERO_ADVANTAGE",
                 "active_records": 0,
                 "logical_step": logical_step,
             }
-        if total_tokens <= 0:
-            raise ValueError("total_tokens_must_be_positive")
         self.model.train()
         before = self._adapter_state()
         before_optimizer = copy.deepcopy(self.optimizer.state_dict())
@@ -542,8 +679,15 @@ class QwenPolicy:
                         loss = self.adapter.compute_loss(self.model, inputs)
                     if not bool(torch.isfinite(loss).item()):
                         raise FloatingPointError("nonfinite_grpo_loss")
-                    weighted = loss * (float(len(row["generated_token_ids"])) / float(total_tokens))
+                    mask_tokens = sum(int(value) for value in row.get("completion_mask", []))
+                    if not mask_tokens:
+                        mask_tokens = len(row["generated_token_ids"])
+                    weighted = loss * (float(mask_tokens) / float(total_tokens))
                     self.scaler.scale(weighted).backward()
+                for name, parameter in self.model.named_parameters():
+                    if name.rsplit(".", 1)[-1] not in {"lora_A", "lora_B"}:
+                        if parameter.grad is not None:
+                            raise RuntimeError(f"frozen_base_received_gradient:{name}")
                 losses.append(float(loss.detach().float().cpu().item()))
             self.scaler.unscale_(self.optimizer)
             grad_norm = float(
@@ -552,6 +696,7 @@ class QwenPolicy:
                 ).item()
             )
             scale_before = float(self.scaler.get_scale())
+            self.guard.record_call("optimizer_update_attempts")
             self.scaler.step(self.optimizer)
             self.scaler.update()
             after = self._adapter_state()
@@ -578,6 +723,9 @@ class QwenPolicy:
                 continue
             if not changed:
                 raise RuntimeError("successful_update_without_delta_change")
+            if not math.isfinite(grad_norm) or grad_norm <= 0:
+                raise FloatingPointError("successful_update_gradient_not_finite_positive")
+            self.guard.record_call("successful_optimizer_updates")
             self.scheduler.step()
             return {
                 "status": "UPDATED",

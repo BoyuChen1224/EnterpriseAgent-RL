@@ -85,6 +85,7 @@ class QwenEngine:
         output: Path,
         adapter: Path | None = None,
         service_profile: ServiceProfile | None = None,
+        parent_adapter: Path | None = None,
     ):
         require_compute_node()
         import torch
@@ -97,7 +98,7 @@ class QwenEngine:
                 raise RuntimeError("profile_model_identity_mismatch")
             if cache.resolve() != service_profile.cache_dir.resolve():
                 raise RuntimeError("profile_cache_path_mismatch")
-            if adapter is None:
+            if adapter is None or parent_adapter is not None:
                 raise RuntimeError("profile_adapter_required")
         self.torch, self.cfg = torch, cfg
         self.events = output / "generations.jsonl"
@@ -149,6 +150,33 @@ class QwenEngine:
             raise RuntimeError("output_attentions_must_be_false_for_sdpa")
         if getattr(self.model.generation_config, "remove_invalid_values", False):
             raise RuntimeError("generation_config_non_finite_repair_enabled")
+        parent_adapter_metadata = None
+        parent_adapter_sha256 = None
+        parent_adapter_config_sha256 = None
+        parent_adapter_merge_count = 0
+        if parent_adapter is not None:
+            parent_adapter_sha256 = sha256_file(parent_adapter / "adapter_model.safetensors")
+            parent_adapter_config_sha256 = sha256_file(parent_adapter / "adapter_config.json")
+            parent_adapter_metadata = merge_lora_adapter(
+                self.model,
+                parent_adapter,
+                expected_model_id=cfg.model_id,
+                expected_revision=cfg.revision,
+            )
+            parent_adapter_metadata.update(
+                {
+                    "adapter_sha256": parent_adapter_sha256,
+                    "adapter_config_sha256": parent_adapter_config_sha256,
+                }
+            )
+            parent_adapter_merge_count = 1
+            torch.cuda.synchronize()
+            if not all(
+                bool(torch.isfinite(parameter).all().item())
+                for parameter in self.model.parameters()
+            ):
+                raise RuntimeError("parent_adapter_merge_produced_non_finite_weights")
+
         adapter_metadata = None
         adapter_sha256 = None
         adapter_config_sha256 = None
@@ -228,7 +256,17 @@ class QwenEngine:
             "adapter_sha256": adapter_sha256,
             "adapter_config_sha256": adapter_config_sha256,
             "base_model_load_count": 1,
+            "parent_adapter": parent_adapter_metadata,
+            "parent_adapter_path": str(parent_adapter) if parent_adapter is not None else None,
+            "parent_adapter_sha256": parent_adapter_sha256,
+            "parent_adapter_config_sha256": parent_adapter_config_sha256,
+            "parent_adapter_merge_count": parent_adapter_merge_count,
             "adapter_merge_count": adapter_merge_count,
+            "merge_order": [
+                "fresh_base",
+                *(["parent_adapter"] if parent_adapter is not None else []),
+                *(["adapter"] if adapter is not None else []),
+            ],
             "service_profile": (
                 {
                     "profile_id": service_profile.profile_id,
@@ -495,13 +533,19 @@ def main():
     parser.add_argument("--model-endpoint")
     parser.add_argument("--health-endpoint")
     parser.add_argument("--adapter", type=Path)
+    parser.add_argument("--parent-adapter", type=Path)
     args = parser.parse_args()
     require_compute_node()
     profile = None
     if args.profile is not None:
         profile = ServiceProfile.load(args.profile, repo_root=args.repo_root)
-        if args.config is not None or args.cache is not None or args.adapter is not None:
-            raise SystemExit("--profile fixes --config/--cache/--adapter")
+        if (
+            args.config is not None
+            or args.cache is not None
+            or args.adapter is not None
+            or args.parent_adapter is not None
+        ):
+            raise SystemExit("--profile fixes --config/--cache/--adapter/--parent-adapter")
         output = args.output.resolve() if args.output is not None else profile.output_dir
         profile = profile.with_paths(output=output).with_endpoints(
             model_completion=args.model_endpoint,
@@ -510,6 +554,7 @@ def main():
         config_path = profile.model_config_path
         cache = profile.cache_dir
         adapter = profile.adapter_dir
+        parent_adapter = None
         port = args.port or int(urlparse(profile.model_completion_endpoint).port or 8001)
     else:
         config_path = args.config or Path("configs/model/qwen2.5-1.5b.toml")
@@ -518,6 +563,7 @@ def main():
         cache = args.cache
         output = args.output
         adapter = args.adapter
+        parent_adapter = args.parent_adapter
         port = args.port or 8001
     if profile is not None:
         profile.preflight(check_database=False, check_benchmark_records=False)
@@ -529,6 +575,7 @@ def main():
             output,
             adapter,
             profile,
+            parent_adapter=parent_adapter,
         )
     except Exception as exc:
         append_event(
