@@ -6,6 +6,10 @@ specific, already-validated asset and to the public benchmark subset exposed
 by the Agent API.  The profile never serializes verifier-only task fields.
 """
 
+# 把模型服务、任务 API 与固定资产绑定起来，避免启动了错误 Adapter 却只检查端口存活。
+# 当前正式 profile 是 Qwen2.5-1.5B 的 sft-n-step27；不能当成通用 Qwen3 部署配置。
+# HTTP health、持久 model-load、任务结果中的模型身份必须相互一致。
+
 from __future__ import annotations
 
 import hashlib
@@ -56,6 +60,7 @@ def _require_loopback(url: str, label: str) -> None:
         raise ValueError(f"{label}_port_required")
 
 
+# 保存固定模型/Adapter、数据库、生成设置、Runtime 及本地端点，路径变更不能绕过身份校验。
 class ServiceProfile(Contract):
     """Resolved, reproducible settings for one local Agent service."""
 
@@ -174,6 +179,8 @@ class ServiceProfile(Contract):
             "adapter_config_sha256": self.adapter_config_sha256,
         }
 
+    # 不加载权重、不生成文本的资产检查；按开关核对数据库和 benchmark 记录。
+    # 模型 ID、revision、权重/config SHA、缓存和任务范围都要匹配，不能仅验证文件存在。
     def preflight(
         self,
         *,
@@ -318,6 +325,7 @@ class ServiceProfile(Contract):
             checks["database"] = self.check_database(self.database_path)
         return checks
 
+    # 物理字节和逻辑内容指纹分别核对；复制文件权限只读不等于内容一定匹配。
     def check_database(self, path: Path) -> dict[str, Any]:
         if not path.is_file():
             raise FileNotFoundError("business_database_missing")
@@ -334,6 +342,7 @@ class ServiceProfile(Contract):
             "mode": oct(path.stat().st_mode & 0o777),
         }
 
+    # 建立获准任务的评分注册表；公开接口只返回公开字段，不把参考 SQL 暴露给 Policy。
     def load_benchmark_registry(self) -> dict[str, BenchmarkTask]:
         """Load only the explicitly selected train tasks for verifier-side use."""
 
@@ -357,6 +366,7 @@ class ServiceProfile(Contract):
         return registry
 
 
+# 本地 HTTP 探针绕过集群代理，并限制超时和响应大小，避免 ready 检查一直挂起。
 def fetch_json(url: str, timeout_s: float) -> dict[str, Any]:
     """Fetch one loopback JSON endpoint without honoring proxy environment variables."""
 
@@ -377,6 +387,7 @@ def fetch_json(url: str, timeout_s: float) -> dict[str, Any]:
     return payload
 
 
+# ready 只是必要条件；还要核对 Adapter/revision、实际加载次数和持久加载记录。
 def validate_model_health(profile: ServiceProfile, payload: dict[str, Any]) -> dict[str, Any]:
     """Validate the server's persisted model-load identity before accepting work."""
 

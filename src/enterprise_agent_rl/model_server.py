@@ -1,5 +1,9 @@
 """Single GPU Transformers server. No model imports or loads on module import."""
 
+# 模型推理 HTTP 层，只负责加载、生成和遥测；不会自己执行 SQL 或给业务任务判分。
+# 调用链：LocalModelPolicy → /v1/chat/completions → QwenEngine.generate → 原始模型事件。
+# 先看 QwenEngine.__init__ 的身份/Adapter 加载，再看 generate 的模板、长度和数值检查。
+
 from __future__ import annotations
 
 import argparse
@@ -34,6 +38,7 @@ from enterprise_agent_rl.model_protocol import GenerationSettings, render_chat_t
 from enterprise_agent_rl.service_config import ServiceProfile, sha256_file
 
 
+# 模型 revision、context、attention 与生成协议的配置，不等于业务任务预算。
 class ModelSettings(Contract):
     model_id: str = Field(min_length=1)
     revision: str = Field(pattern=r"^[a-f0-9]{40}$")
@@ -78,6 +83,8 @@ def append_event(path: Path, event: dict) -> None:
 
 
 class QwenEngine:
+    # 只在受支持的计算节点与单可见 GPU 上初始化，离线读取固定 cache，不下载或执行 remote code。
+    # 按需要先合并 parent 再合并 adapter，记录实际 SHA 与 merge 次数，防止模型名相同但权重不同。
     def __init__(
         self,
         cfg: ModelSettings,
@@ -154,6 +161,7 @@ class QwenEngine:
         parent_adapter_sha256 = None
         parent_adapter_config_sha256 = None
         parent_adapter_merge_count = 0
+        # GRPO 评测的 parent 是 SFT Adapter；必须先合并它，不能把 delta 直接加在 fresh Base 上。
         if parent_adapter is not None:
             parent_adapter_sha256 = sha256_file(parent_adapter / "adapter_model.safetensors")
             parent_adapter_config_sha256 = sha256_file(parent_adapter / "adapter_config.json")
@@ -319,6 +327,8 @@ class QwenEngine:
                 "message": str(exc),
             }
 
+    # 一条 HTTP 请求对应一次物理生成。按当前 tokenizer 渲染，限制输入+输出长度，并保存事件。
+    # 输出字符串只用于解析 Action；模型不会通过本接口获得参考 SQL 或业务评分答案。
     def generate(self, request: CompletionRequest) -> dict:
         from transformers import LogitsProcessorList, StoppingCriteria, StoppingCriteriaList
 
@@ -353,12 +363,14 @@ class QwenEngine:
             inputs = self.tokenizer(text, return_tensors="pt").to("cuda:0")
             prompt_tokens = inputs.input_ids.shape[-1]
             event["telemetry"]["input_tokens"] = prompt_tokens
+            # 超出上下文直接拒绝，不截掉历史或目标后继续把结果当作同一请求。
             if prompt_tokens + request.max_tokens > self.cfg.max_context_tokens:
                 raise ValueError("context_length_exceeded")
             torch.manual_seed(request.seed)
             kwargs = {"do_sample": request.temperature > 0}
             if request.temperature > 0:
                 kwargs.update(temperature=request.temperature, top_p=request.top_p, top_k=0)
+            # 每个生成步骤检查 logits 是否有限，不用移除 NaN/Inf 的方式把数值错误伪装成正常回答。
             guard = FiniteLogitsProcessor(
                 prompt_tokens=prompt_tokens,
                 context={
@@ -483,6 +495,8 @@ class QwenEngine:
             torch.cuda.empty_cache()
 
 
+# 提供 health/models 与兼容的 chat completions 接口；生成加互斥锁，忙时返回 429。
+# 这是单模型本地推理服务，不能据此宣称已支持 GPU 连续批处理或生产级高并发。
 def create_model_app(engine) -> FastAPI:
     app = FastAPI(title="Slurm-local Qwen FP16")
     lock = threading.Lock()

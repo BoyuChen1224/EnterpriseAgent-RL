@@ -1,5 +1,9 @@
 """Local FastAPI demo; durable status records and bounded background work."""
 
+# 业务任务 API：提交任务、保存 job 状态、运行 Agent、返回轨迹和可选 benchmark 评分。
+# 它与 model_server.py 分工不同：模型服务返回 Action，任务服务才调用 Runtime/SQL/Verifier。
+# 未提供 profile 时默认是确定性 CPU fixture；真实 SFT 服务需要已验证的模型 profile。
+
 from __future__ import annotations
 
 import json
@@ -32,6 +36,8 @@ class CompareRequest(Contract):
     benchmark_task_id: str | None = None
 
 
+# 用于任务状态持久化的独立 SQLite，与只读业务数据库不是同一个库。
+# 服务重启时将遗留 queued/running 记录标为失败，当前实现不会自动续跑这些任务。
 class JobStore:
     def __init__(self, path: Path):
         self.path = path
@@ -69,6 +75,7 @@ TECHNICAL_TERMINAL_REASONS = {
 }
 
 
+# 区分传输/运行时错误与普通业务失败，防止无有效模型结果时仍给一个看似正式的业务零分。
 def is_technical_failure(trajectory) -> bool:
     """Separate transport/runtime qualification failures from business outcomes."""
 
@@ -78,6 +85,7 @@ def is_technical_failure(trajectory) -> bool:
     )
 
 
+# 构造 API 并绑定数据库、策略工厂和 benchmark 注册表；profile 路径会先校验模型真实身份。
 def create_app(
     database: Path,
     output: Path,
@@ -156,6 +164,8 @@ def create_app(
     slots = threading.BoundedSemaphore(8)
     app = FastAPI(title="EnterpriseAgent-RL", version="0.1.0")
 
+    # 后台执行一个任务：运行 → 保存未评分轨迹 → 判断技术资格 → 可选独立评分 → 更新任务记录。
+    # 任意公开问题没有参考答案时仍可运行，但不能假装已经获得 benchmark 正确性评分。
     def execute(job: dict, request: SubmitRequest) -> None:
         raw_path = None
         try:
@@ -184,8 +194,10 @@ def create_app(
                         }
                     }
                 )
+            # 先保存原始运行，再做评分；评分本身失败时仍可追查模型到底生成并执行过什么。
             raw_path = raw_store.save(trajectory)
             technical = is_technical_failure(trajectory)
+            # 只有明确绑定 benchmark 且技术合格时才运行隐藏 Verifier；普通 SQL 错误仍保留评分资格。
             if request.benchmark_task_id and not technical:
                 trajectory = trajectory.model_copy(
                     update={

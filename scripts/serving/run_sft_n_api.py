@@ -8,6 +8,10 @@ The explicit ``serve`` mode only keeps those services ready; it never schedules
 benchmark work on its own.
 """
 
+# 当前 1.5B SFT N 的本地服务 launcher，同时监督模型 HTTP 和 Agent API 子进程。
+# smoke 执行固定任务后退出；serve 维持服务。两者共享全局 deadline、日志和有限清理流程。
+# 现成 profile 不是 Qwen3 一键任务服务；模型的 HTTP 评测与正式任务 API 部署要分别理解。
+
 from __future__ import annotations
 
 import argparse
@@ -111,6 +115,7 @@ def absolute_path_without_resolving(path: Path, *, base: Path) -> Path:
     return path if path.is_absolute() else (base / path).absolute()
 
 
+# 保留虚拟环境的入口路径，不把 symlink resolve 成系统 Python 后丢失 venv 环境。
 def resolve_python_executable(path: Path | None, *, root: Path) -> Path:
     """Preserve a venv entry-point symlink while making relative paths usable."""
 
@@ -118,6 +123,7 @@ def resolve_python_executable(path: Path | None, *, root: Path) -> Path:
     return absolute_path_without_resolving(requested, base=root)
 
 
+# 默认生成唯一 run 目录；显式已有目录拒绝复用，避免不同服务实例覆盖日志和轨迹。
 def allocate_run_dir(
     profile: ServiceProfile,
     requested: Path | None,
@@ -169,6 +175,7 @@ def copy_read_only_database(profile: ServiceProfile, run_dir: Path) -> tuple[Pat
     }
 
 
+# 从显式 repo root、解释器和本次目录启动独立进程组，后续只回收这些归属清楚的子进程。
 def spawn_service(
     name: str,
     command: list[str],
@@ -204,6 +211,7 @@ def spawn_service(
     }
 
 
+# 同时检查子进程存活、HTTP 就绪与全局剩余时间；端口可连不等于加载了正确模型。
 def wait_for_ready(
     url: str,
     process: subprocess.Popen,
@@ -343,6 +351,7 @@ def _count_evidence(
     }
 
 
+# 优先读取实际事件/audit 的计数，缺失时才使用明确的轨迹来源；无来源保持 null。
 def collect_runtime_evidence(run_dir: Path) -> dict[str, dict[str, Any]]:
     """Derive runtime counts once from durable, run-local evidence.
 
@@ -440,6 +449,7 @@ def collect_runtime_evidence(run_dir: Path) -> dict[str, dict[str, Any]]:
     }
 
 
+# 汇总已经保存的结果与资源来源，区分服务 wall time 和实际 GPU allocation。
 def finalize_results(
     run_dir: Path,
     task_ids: tuple[str, ...] | list[str],
@@ -504,6 +514,7 @@ def persist_unknown_panels(
         )
 
 
+# 经真实任务 HTTP 接口运行固定 train smoke；技术资格合格的业务失败保留，不自动重试。
 def run_smoke(
     profile: ServiceProfile,
     run_dir: Path,
@@ -639,6 +650,7 @@ def run_smoke(
         raise
 
 
+# serve 的等待也受同一 deadline 和信号控制，不另开无限时长。
 def wait_for_serve(
     processes: dict[str, subprocess.Popen],
     *,
@@ -801,6 +813,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+# 串起预检、启动、smoke/serve 和 finally 清理，部分任务完成后发生故障仍保存已有结果。
 def _bounded_main() -> int:
     """Run the T-027 supervisor with one deadline and durable partial results."""
 

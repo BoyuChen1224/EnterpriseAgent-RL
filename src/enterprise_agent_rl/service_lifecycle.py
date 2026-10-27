@@ -6,6 +6,10 @@ child-process classification, and bounded process-group teardown so those
 rules can be exercised with CPU-only subprocesses.
 """
 
+# 本地服务监督的基础组件，不负责模型内容和业务评分，可用 CPU 子进程独立测试。
+# 生命周期使用一个全局单调 deadline，启动、请求、轮询不能各自重新获得整段运行时间。
+# 清理预算与工作预算分开，超时或 TERM/INT 时仍需收回本 launcher 拥有的子进程。
+
 from __future__ import annotations
 
 import os
@@ -46,6 +50,7 @@ class ServiceProcessExited(LifecycleError):
         super().__init__(f"{label}_exited:{returncode}")
 
 
+# 统一记录工作截止和清理截止；用 monotonic 避免系统墙钟调整影响剩余时间。
 @dataclass
 class LifecycleClock:
     """One monotonic work deadline plus a separate bounded cleanup reserve."""
@@ -82,6 +87,7 @@ class LifecycleClock:
         if self.remaining_s <= 0:
             raise DeadlineExceeded(stage)
 
+    # 阻塞操作使用 min(该阶段上限, 全局剩余时间)，不会因反复轮询而无限续期。
     def timeout(self, stage_limit_s: float, stage: str) -> float:
         """Return a blocking timeout bounded by the one run-global deadline."""
 
@@ -93,6 +99,7 @@ class LifecycleClock:
         return min(stage_limit_s, remaining)
 
 
+# 信号 handler 只登记第一个停止信号，在安全的控制点抛出异常，清理时避免重复打断。
 @dataclass
 class SignalController:
     """Signal state shared by the handler and blocking supervisor helpers."""
@@ -109,6 +116,8 @@ class SignalController:
             raise SupervisorSignal(self.signum)
 
 
+# 仅回收调用方持有的子进程组：先 TERM、有限等待，再 KILL 并收尾。
+# 它不查询或接管集群其他会话的进程/Job，也不保证远端非本进程组资源被清理。
 def stop_process_group(
     process: subprocess.Popen | None,
     grace_s: float = 15.0,
