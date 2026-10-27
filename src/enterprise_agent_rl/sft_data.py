@@ -6,6 +6,10 @@ would make a data-construction command touch validation and test databases.  SFT
 construction therefore validates the frozen manifest and opens only train files.
 """
 
+# 历史 SFT 轨迹数据构建链：冻结 train 来源 → 检查候选轨迹 → 去重 → 转消息和监督索引。
+# 这里的整轨迹样本与 Qwen3 当前的 54 条逐决策样本不是同一种单位，不可混用计数。
+# 训练 SQL 可作为 train 监督标签，但不能把 BenchmarkTask 的隐藏评分字段复制到模型上下文。
+
 from __future__ import annotations
 
 import hashlib
@@ -72,6 +76,8 @@ def _git_commit() -> str:
     return result.stdout.strip() if result.returncode == 0 else "unknown"
 
 
+# 此版本号来自 rewards.py 的源文件字节哈希；注释变化也会改变指纹。
+# 历史数据仍保留原运行版本，不能为了通过新代码检查回写旧来源记录。
 def reward_version() -> str:
     """Return a source fingerprint for the formal verifier/reward implementation."""
 
@@ -79,6 +85,8 @@ def reward_version() -> str:
     return f"verify:{hashlib.sha256(path.read_bytes()).hexdigest()}"
 
 
+# 允许核对 split 元数据，但只选择 train 任务，并只打开其引用的 train 数据库。
+# 完整 manifest 的存在不代表获得读取全部 split 数据内容的权限。
 def load_train_source(manifest_path: Path, database_root: Path) -> TrainSource:
     """Validate the frozen manifest while opening only train databases.
 
@@ -183,6 +191,8 @@ def _source_for_policy(policy_kind: str) -> str | None:
     return KNOWN_POLICY_SOURCES.get(policy_kind)
 
 
+# 有真实模型输出时验证它与执行动作一致；程序化教师则使用实际 Action 序列化。
+# 两种来源需要显式记录，不能把程序化输出冒称真实 LLM generation。
 def _assistant_content(step: Any) -> tuple[str, bool]:
     """Return the actual generation when available, otherwise a teacher action JSON."""
 
@@ -197,6 +207,8 @@ def _assistant_content(step: Any) -> tuple[str, bool]:
     return _json(step.action.model_dump()), False
 
 
+# 按实际执行顺序组织 system、任务、assistant Action 与 user 工具反馈。
+# 标记 assistant_message_indices，使后续分词只监督动作，不训练工具返回的数据库内容。
 def trajectory_to_example(
     trajectory: Trajectory,
     record: dict[str, Any],
@@ -274,6 +286,7 @@ def _validate_example(example: dict[str, Any]) -> None:
             raise ValueError("tool_observation_missing")
 
 
+# 筛选候选的数据来源、执行证据、评分和质量，保留拒绝原因，不能只凭文件名判断成功。
 def _candidate_reasons(
     trajectory: Trajectory,
     source: TrainSource,
@@ -399,6 +412,7 @@ def _quality_flags(
     }
 
 
+# 固定输入构建数据与质量报告。候选拒绝、重复和来源都进入记录，不悄悄拼入验证答案。
 def build_sft_dataset(
     manifest_path: Path,
     database_root: Path,

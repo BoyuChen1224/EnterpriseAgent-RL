@@ -1,5 +1,9 @@
 """Small, dependency-light helpers for stable autoregressive inference."""
 
+# 集中控制 attention 后端与非有限 logits 检查，供模型服务、SFT 和 GRPO 复用。
+# Transformers 的 sdpa 只是接口选项；要强制 math，还需 PyTorch SDPA 后端上下文。
+# 训练时上下文应覆盖 forward/backward/重算，推理时包住 generate 的实际模型调用。
+
 from __future__ import annotations
 
 import contextlib
@@ -19,6 +23,7 @@ def transformers_attention_implementation(backend: AttentionBackend) -> str:
     raise ValueError(f"unsupported_attention_backend:{backend}")
 
 
+# 兼容两代 PyTorch SDPA 控制 API。没有可用的显式 math 控制时拒绝静默退回其他 GPU 后端。
 def _sdpa_backend_control(torch_module: Any, backend: AttentionBackend) -> dict[str, Any]:
     if backend == "eager":
         return {
@@ -78,6 +83,7 @@ def describe_attention_backend(torch_module: Any, backend: AttentionBackend) -> 
     return _sdpa_backend_control(torch_module, backend).copy()
 
 
+# 在当前动态作用域内强制指定后端，退出时恢复；CPU 路径不套用 CUDA 控制。
 @contextlib.contextmanager
 def attention_backend_context(
     torch_module: Any, backend: AttentionBackend
@@ -140,6 +146,7 @@ def _logits_statistics(logits: Any) -> dict[str, Any]:
     }
 
 
+# 检查原始模型 logits 的 NaN/Inf 并记录诊断。出现非有限值时报告问题，不伪造正常回答。
 def check_finite_logits(
     logits: Any,
     *,
@@ -176,6 +183,7 @@ def check_finite_logits(
     raise NonFiniteLogitsError(payload)
 
 
+# 接入自回归生成的每一步，及时捕获中途才出现的数值异常。
 class FiniteLogitsProcessor:
     """Transformers-compatible processor checked on every generation step."""
 

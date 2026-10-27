@@ -7,6 +7,10 @@ gradient schedule below after the base model has been frozen and LoRA has
 been injected.
 """
 
+# 当前 Qwen3 固定配方的核心：54 个决策点重新分词，2 epochs，累积 4 微批，27 次成功更新。
+# CPU tiny 与真实训练复用此训练循环，但 tiny 只验证程序和梯度，不是 Qwen3 能力结果。
+# 阅读顺序：build_full_tokenized_dataset → make_schedule → train_lora_schedule。
+
 from __future__ import annotations
 
 import hashlib
@@ -81,6 +85,7 @@ def set_seed(seed: int, torch_module: Any) -> None:
         torch_module.cuda.manual_seed_all(seed)
 
 
+# 保存 Python、CPU Torch 及可用 CUDA 的随机状态；AMP 重放和训练恢复需要它们。
 def capture_rng(torch_module: Any) -> dict[str, Any]:
     state: dict[str, Any] = {
         "python": random.getstate(),
@@ -114,6 +119,7 @@ def tensor_hash(parameter: Any) -> str:
     return sha256_bytes(tensor.numpy().tobytes())
 
 
+# 按参数内容生成指纹，用于确认 Base 未变化及 AMP skip 没有偷偷更新权重。
 def parameter_hash(model: Any, *, include_lora: bool) -> str:
     digest = hashlib.sha256()
     for name, parameter in model.named_parameters():
@@ -148,6 +154,8 @@ def optimizer_state_hash(optimizer: Any) -> str:
     return digest.hexdigest()
 
 
+# 保留并重新渲染全部 54 条，检查目标 Action 是唯一且最后的监督区间。
+# 此配方固定检查动作分布，拒绝静默丢样本、旧 token 混用和上下文截断。
 def build_full_tokenized_dataset(
     tokenizer: Any,
     rows: list[dict[str, Any]],
@@ -217,6 +225,7 @@ def build_full_tokenized_dataset(
     )
 
 
+# 将实际 token/labels、逐样本 mask 检查和输入指纹一起保存，支持训练后核对。
 def write_tokenized_artifacts(
     output: Path,
     *,
@@ -302,6 +311,8 @@ def write_tokenized_artifacts(
     return dataset_manifest
 
 
+# 先按 epoch 重复样本，再以 accumulation_steps 分组；本配方允许一组跨 epoch 边界。
+# 54×2=108 微批，108/4=27 组，不能每个 epoch 都丢掉不足一组的尾部。
 def make_schedule(
     examples: list[dict[str, Any]], *, epochs: int, accumulation_steps: int
 ) -> list[list[dict[str, Any]]]:
@@ -323,6 +334,7 @@ def make_schedule(
     ]
 
 
+# 保存精确样本顺序、分组和更新边界，不能仅靠 epoch 数解释实际更新数。
 def schedule_manifest(
     examples: list[dict[str, Any]], *, epochs: int, accumulation_steps: int
 ) -> dict[str, Any]:
@@ -364,6 +376,7 @@ def _autocast(torch_module: Any, *, device: str, enabled: bool):
     return torch_module.autocast(device_type=device.split(":", 1)[0], dtype=torch_module.float16)
 
 
+# 构造完整序列与 attention_mask；loss 的目标位置由 labels 的 -100 遮罩控制。
 def _batch(torch_module: Any, item: dict[str, Any], device: str) -> dict[str, Any]:
     input_ids = torch_module.tensor([item["input_ids"]], dtype=torch_module.long, device=device)
     labels = torch_module.tensor([item["labels"]], dtype=torch_module.long, device=device)
@@ -374,6 +387,9 @@ def _batch(torch_module: Any, item: dict[str, Any], device: str) -> dict[str, An
     }
 
 
+# 只支持本固定样本数和 microbatch=1。成功更新、backward 尝试和 AMP skip 分别累计。
+# 先累积梯度，再 unscale/裁剪，最后交给原生 GradScaler 决定是否真正执行 optimizer.step。
+# resume_state 恢复 optimizer/scaler/RNG/游标，模型 LoRA 权重需由调用方先恢复。
 def train_lora_schedule(
     model: Any,
     examples: list[dict[str, Any]],
@@ -430,6 +446,7 @@ def train_lora_schedule(
     ]
     if any(parameter.requires_grad for _, parameter in base_parameters):
         raise Qwen3SFTError("base_model_trainable_parameter_count_nonzero")
+    # 记录冻结 Base 与 LoRA 初值；训练后既要确认可训练参数变化，也要确认 Base 没有变化。
     base_hash_before = parameter_hash(model, include_lora=False)
     lora_before = {
         name: parameter.detach().cpu().clone()
@@ -461,6 +478,7 @@ def train_lora_schedule(
     update_metrics: list[dict[str, Any]] = []
     replay_metrics: list[dict[str, Any]] = []
 
+    # 只允许从完整更新边界恢复，避免把半组梯度误当成一个完成的 optimizer update。
     if resume_state is not None:
         cursor = int(resume_state["cursor"])
         update_count = int(resume_state["successful_updates"])
@@ -490,6 +508,8 @@ def train_lora_schedule(
                 # backward, and reentrant checkpoint recomputation.  The
                 # context must surround backward as well as model() because
                 # reentrant recomputation happens during backward.
+                # attention 后端控制必须包住 backward。
+                # reentrant checkpoint 会在反向阶段重新做 forward。
                 with attention_backend_context(torch_module, "sdpa_math"):
                     with _autocast(
                         torch_module,
@@ -506,6 +526,7 @@ def train_lora_schedule(
                         loss = outputs.loss
                     if not bool(torch_module.isfinite(loss).all().item()):
                         raise Qwen3SFTError("non_finite_loss")
+                    # 每个微批的 loss 除以累积步数，四次 backward 共同构成一次更新的梯度。
                     scaler.scale(loss / accumulation_steps).backward()
                 backward_count += 1
                 if gradient_injector is not None:
@@ -523,6 +544,7 @@ def train_lora_schedule(
                 )
                 del outputs, loss, batch
 
+            # 先去除 AMP scale 再检查/裁剪梯度，否则看到的梯度范数仍包含人为缩放。
             scaler.unscale_(optimizer)
             missing_gradients = [
                 name
@@ -554,6 +576,7 @@ def train_lora_schedule(
             optimizer_hash_after_step = optimizer_state_hash(optimizer)
             skipped = scale_after < scale_before
 
+            # 非有限梯度由原生 scaler 跳过更新，并验证参数/optimizer 未变化；这次不推进游标。
             if not finite_gradients or skipped:
                 if not skipped:
                     raise Qwen3SFTError("native_scaler_did_not_skip_non_finite_gradient")
@@ -592,12 +615,14 @@ def train_lora_schedule(
                     }
                 )
                 optimizer.zero_grad(set_to_none=True)
+                # 同一组重放恢复 RNG，避免一次溢出变相换了一组随机训练输入；scale 保留降低后的值。
                 restore_rng(torch_module, group_rng)
                 retry += 1
                 if retry > max_replays_per_group:
                     raise Qwen3SFTError("amp_replay_limit_exhausted")
                 continue
 
+            # 只有真正成功的更新才推进数据游标。不能把尝试过 optimizer.step 直接算作成功训练。
             update_count += 1
             cursor += accumulation_steps
             update_metrics.append(

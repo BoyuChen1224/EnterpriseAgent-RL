@@ -6,6 +6,10 @@ the CPU preflight and the GPU trainer: dataset gates, chat-template rendering,
 and assistant-only label spans.  It does not import torch or load a model.
 """
 
+# SFT 输入和 token 监督范围的公共实现，尽量不在导入时加载 GPU 依赖。
+# 旧 load_dataset_rows 对应固定 20 条整轨迹；load_decision_rows 对应固定 54 条逐决策输入。
+# 先确认文本、来源和模板，再构造 labels；不能把旧模型的 token IDs 直接用于 Qwen3。
+
 from __future__ import annotations
 
 import hashlib
@@ -64,6 +68,7 @@ def _token_list(value: Any) -> list[int]:
         raise SFTDataError("chat_template_tokenization_returned_non_integer_ids") from exc
 
 
+# 装载历史整轨迹数据，校验元数据、train 来源和固定样本分布；不是任意 JSONL 的通用加载器。
 def load_dataset_rows(
     dataset_path: Path, metadata_path: Path
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -164,6 +169,8 @@ def _chat_ids(
     )
 
 
+# 根据当前 tokenizer 自带的 chat template 定位 assistant 内容与结束符。
+# 返回 input_ids 和 labels；标签为 -100 的位置仅充当上下文，不进入语言模型交叉熵。
 def format_sft_example(
     tokenizer: ChatTokenizer,
     example: dict[str, Any],
@@ -205,6 +212,7 @@ def format_sft_example(
             add_generation_prompt=False,
             enable_thinking=enable_thinking,
         )
+        # 模板前缀可能受分词边界影响，必须与完整序列逐 token 对齐，不能凭字符偏移猜标签位置。
         if full_ids[: len(prefix_ids)] != prefix_ids:
             raise SFTDataError(f"assistant_prefix_alignment_failed:{example.get('example_id')}")
         if full_ids[: len(end_ids)] != end_ids:
@@ -215,10 +223,12 @@ def format_sft_example(
         spans.append((start, end))
         previous_end = end
 
+    # 超长直接拒绝，不截掉工具反馈或目标动作后仍声称该样本训练完成。
     if max_length is not None and len(full_ids) > max_length:
         raise SFTDataError(
             f"sequence_exceeds_context_without_truncation:{example.get('example_id')}"
         )
+    # 先全部屏蔽，再只打开审核过的 assistant 区间；工具反馈和 system/user 文本不作为目标。
     labels = [-100] * len(full_ids)
     for start, end in spans:
         labels[start:end] = full_ids[start:end]
@@ -238,6 +248,7 @@ def format_sft_example(
     }
 
 
+# 在训练前检查每条的实际监督范围和上下文长度，而不只相信 assistant_only_loss 标记。
 def audit_tokenized_dataset(
     tokenizer: ChatTokenizer,
     rows: list[dict[str, Any]],
@@ -308,6 +319,8 @@ def audit_tokenized_dataset(
     }
 
 
+# 只提取冻结数据的公开历史与当前目标 Action，并验证 train 身份和未来结果缺失。
+# 旧 input_ids、labels、token span 不作为当前模型的训练数据使用。
 def load_decision_rows(dataset_path: Path, *, expected_sha256: str) -> list[dict[str, Any]]:
     """Load the frozen train-only decision rows without using old token IDs.
 
@@ -377,6 +390,8 @@ def load_decision_rows(dataset_path: Path, *, expected_sha256: str) -> list[dict
     return rows
 
 
+# 将一个决策点转为标准 SFT 样本：已有上下文 + 最后一个 assistant 目标。
+# 过去的 assistant 动作虽在上下文中，本样本仅监督最后这个决策。
 def decision_example(row: dict[str, Any]) -> dict[str, Any]:
     """Rebuild one assistant-only example from public context and Action."""
 
@@ -397,6 +412,7 @@ def decision_example(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# 最小可行性 smoke 的有限选样入口；正式 Qwen3 配方由 qwen3_sft 保留全部 54 条。
 def select_decision_examples(
     tokenizer: ChatTokenizer,
     rows: list[dict[str, Any]],

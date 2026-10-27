@@ -7,6 +7,10 @@ assembled by the environment from the actual SQL observation and are later
 checked by the independent formal verifier.
 """
 
+# 这是离线 train 数据构建的程序化教师，不是用来参加 Base/SFT/GRPO 评测的策略。
+# 它用 train 标签决定 SQL，再通过正常 Runtime 执行；最终答案由真实查询结果组装。
+# 不要把“教师能访问 train 标签”误解为业务模型在 validation 推理时也能看到标签。
+
 from __future__ import annotations
 
 import hashlib
@@ -32,6 +36,8 @@ def _decision(kind: str, **arguments: Any) -> Decision:
     return Decision(action=Action(kind=kind, arguments=arguments))
 
 
+# 只接受 train 任务，按历史观察逐步输出计划、必要工具、SQL、check 和 finish。
+# 轨迹会经过正式 Verifier；教师来源必须与真实模型采样来源区分。
 class ReferenceSQLTeacherPolicy:
     """A deterministic train-only policy that uses one task's reference SQL."""
 
@@ -58,6 +64,8 @@ class ReferenceSQLTeacherPolicy:
         prompt = self.task.public.prompt.lower()
         return "收入" in self.task.public.prompt or "revenue" in prompt
 
+    # 每次只产生下一条 Action，不把参考结果直接写成最终表格。
+    # 异常 SQL 或预期步骤失败立即报告，避免把伪造观察当作可监督轨迹。
     def decide(
         self,
         task: PublicTask,
@@ -113,6 +121,8 @@ class ReferenceSQLTeacherPolicy:
         if self._needs_dictionary() and not self._successful(history, "dictionary"):
             return _decision("dictionary", term="revenue")
 
+        # 受控恢复任务会主动构造一次已知错误，用于提供恢复状态监督。
+        # 这不等于自然发生错误后的普遍鲁棒性，评测时应区分两种场景。
         if self.task.required_sql_error:
             legacy_errors = [
                 step
@@ -166,6 +176,7 @@ class ReferenceSQLTeacherPolicy:
         raise ReferenceSQLTeacherError("teacher_state_unreachable")
 
 
+# 从已保存步骤中确认参考 SQL 是否真实执行，不为统计再调用一次数据库。
 def reference_sql_execution_status(trajectory: Trajectory, reference_sql: str) -> dict[str, Any]:
     """Summarize the SQL action's actual runtime observation without re-executing it."""
 
@@ -203,6 +214,7 @@ def reference_sql_execution_status(trajectory: Trajectory, reference_sql: str) -
     }
 
 
+# 给教师轨迹补来源与执行身份；来源元数据不应混入学生可见的公开问题。
 def with_reference_sql_provenance(trajectory: Trajectory, task: BenchmarkTask) -> Trajectory:
     """Attach auditable supervision metadata without storing raw reference SQL."""
 
@@ -228,6 +240,7 @@ def with_reference_sql_provenance(trajectory: Trajectory, task: BenchmarkTask) -
     )
 
 
+# 通过与业务策略相同的 episode 入口运行教师，沿用工具、预算和轨迹记录。
 def run_reference_sql_teacher(
     task: BenchmarkTask,
     database: Path,

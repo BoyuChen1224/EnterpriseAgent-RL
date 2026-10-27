@@ -6,6 +6,10 @@ plus ``adapter_model.safetensors``) while keeping base-model loading and
 production inference unchanged when no adapter is supplied.
 """
 
+# 手工 LoRA 实现：冻结原 Linear，在其旁边训练低秩修正，不依赖 PEFT 执行训练。
+# 推理计算为 W x + (alpha/r) B A x；本实现低秩参数保持 FP32，残差转回原输出 dtype。
+# 训练恢复 load_lora_adapter 与推理合并 merge_lora_adapter 含义不同，不能互换。
+
 from __future__ import annotations
 
 import json
@@ -32,6 +36,8 @@ def _is_target_linear(name: str, module: Any, target_modules: set[str]) -> bool:
     return isinstance(module, torch.nn.Linear) and name.rsplit(".", 1)[-1] in target_modules
 
 
+# 仅替换指定名称的 Linear。先列出模块再替换，避免遍历时改变模型结构。
+# A 随机初始化、B 为零，使新增分支起始增量为零；最初部分梯度为零不自动代表断图。
 def inject_lora_modules(
     model: Any,
     *,
@@ -101,6 +107,7 @@ def iter_lora_modules(model: Any):
             yield name, module
 
 
+# 按实际注册的 lora_A/lora_B 参数名选择优化器参数，同时再次冻结其他权重。
 def trainable_lora_parameters(model: Any) -> list[Any]:
     parameters = []
     for name, parameter in model.named_parameters():
@@ -126,6 +133,7 @@ def lora_parameter_names(model: Any) -> list[str]:
     ]
 
 
+# 只导出低秩张量，使用兼容的键名；不会把 Base 权重复制进 Adapter 文件。
 def adapter_state_dict(model: Any) -> dict[str, Any]:
     """Return PEFT-shaped keys without serializing the frozen base model."""
 
@@ -139,6 +147,7 @@ def adapter_state_dict(model: Any) -> dict[str, Any]:
     return state
 
 
+# 保存 safetensors 和绑定 model_id/revision、rank、模块名的配置，方便后续校验加载。
 def save_adapter(
     model: Any,
     adapter_dir: Path,
@@ -185,6 +194,8 @@ def save_adapter(
     }
 
 
+# 把 (alpha/r) B@A 原位加进当前 Linear 权重，供推理使用。
+# 该操作不是幂等的：重复调用会重复叠加；多臂对照要从 fresh Base 按顺序加载。
 def merge_lora_adapter(
     model: Any,
     adapter_dir: Path,
@@ -247,6 +258,7 @@ def merge_lora_adapter(
                 raise RuntimeError(f"adapter_a_shape_mismatch:{name}")
             if tuple(b.shape) != (module.out_features, rank):
                 raise RuntimeError(f"adapter_b_shape_mismatch:{name}")
+            # 先以 FP32 计算并检查增量，再转换成 Base 权重 dtype；权重变化不保证贪心输出会改变。
             delta = (b @ a) * scaling
             if not bool(torch.isfinite(delta).all().item()):
                 raise RuntimeError(f"adapter_non_finite_delta:{name}")
@@ -264,6 +276,7 @@ def merge_lora_adapter(
     }
 
 
+# 恢复已注入模块中的 A/B，不合并进 Base；用于继续训练并配合 optimizer/RNG 等状态恢复。
 def load_lora_adapter(
     model: Any,
     adapter_dir: Path,

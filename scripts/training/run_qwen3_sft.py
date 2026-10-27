@@ -7,6 +7,10 @@ references.  ``prepare`` and ``tiny`` are CPU-only; ``train`` and ``reload``
 require one visible CUDA device on a Slurm compute node.
 """
 
+# 当前 Qwen3 SFT 命令入口，核心训练循环位于 enterprise_agent_rl/qwen3_sft.py。
+# 阶段分开保存：prepare 构建数据，tiny 做 CPU 回归，train 真训练，reload 独立加载验证。
+# 这里的 GPU 命令需要已有资产和资源计划；阅读代码或运行 --help 不会启动训练。
+
 from __future__ import annotations
 
 import argparse
@@ -236,6 +240,7 @@ def _tokenizer(cfg: ModelSettings, cache: Path):
     return tokenizer
 
 
+# 加载冻结 54 决策的公开上下文和目标，用 Qwen3 模板重新分词并保存 mask/调度检查。
 def _prepare(args: argparse.Namespace) -> int:
     output = args.output
     train_cfg = tomllib.loads(args.training_config.read_text())
@@ -402,6 +407,7 @@ def _save_checkpoint(
     return checkpoint
 
 
+# 加载 Base、注入 LoRA、调用共享训练循环；保存真实更新、checkpoint 和参数不变性检查。
 def _train(args: argparse.Namespace) -> int:
     output = args.output
     train_cfg = tomllib.loads(args.training_config.read_text())
@@ -615,6 +621,8 @@ def _train(args: argparse.Namespace) -> int:
     return 0
 
 
+# 用新加载的 Base 合并最终 SFT Adapter 做有限 forward，核对实际加载身份和有限 logits。
+# 重载通过是技术门槛，不能代替 validation 上的业务评测。
 def _reload(args: argparse.Namespace) -> int:
     output = args.output
     train_cfg = tomllib.loads(args.training_config.read_text())
@@ -695,6 +703,7 @@ def _reload(args: argparse.Namespace) -> int:
     return 0
 
 
+# 随机小模型的 CPU 回归，检查配方、梯度累积和恢复路径；不记作真实 Qwen3 训练或能力。
 def _tiny(args: argparse.Namespace) -> int:
     """CPU gate using a random, tiny Qwen3 implementation and the real schedule."""
 
@@ -779,6 +788,7 @@ def _tiny(args: argparse.Namespace) -> int:
     return 0
 
 
+# 解析显式阶段和目录再分派；阶段失败返回非零，不把准备完成当作训练/评测完成。
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--stage", choices=("prepare", "train", "reload", "tiny"), required=True)
