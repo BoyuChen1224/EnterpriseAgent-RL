@@ -1,5 +1,9 @@
 """Offline execution evaluation. Fixture reports are always labeled as such."""
 
+# 通用离线评测：运行 episode → 独立 verify → 存轨迹 → 汇总指标。
+# 本模块汇总已评分轨迹；正式 GRPO 冻结比较还有 grpo/evaluation.py 的资格与 unknown 处理。
+# 阅读计数时要区分模型物理请求、轨迹 Action、真实 SQL worker 和评分侧参考 SQL。
+
 from __future__ import annotations
 
 import json
@@ -14,6 +18,8 @@ from enterprise_agent_rl.rewards import verify
 from enterprise_agent_rl.trajectories import Trajectory, TrajectoryStore, database_fingerprint
 
 
+# 拒绝未评分轨迹和不允许的策略/数据库混用。缺失 token/延迟来源时返回 None。
+# sql_calls 来自轨迹中的 SQL 动作，可能包含执行前预算拒绝，不能直接冒充 worker 次数。
 def summarize(
     trajectories: list[Trajectory], settings: Settings, *, allow_multiple_databases: bool = False
 ) -> dict:
@@ -27,6 +33,7 @@ def summarize(
         raise ValueError("cannot_mix_policies_or_databases")
     sql = [s for t in trajectories for s in t.steps if s.tool_name == "sql"]
     tools = [s for t in trajectories for s in t.steps if s.tool_name]
+    # 失败 episode 可能存在未完整记录的生成；来源不完整时不输出看似精确的平均 token。
     tokens_known = all(
         all(s.token_usage_known for s in t.steps)
         and (t.policy_kind == "deterministic_fixture" or t.terminal_reason == "completed")
@@ -38,6 +45,7 @@ def summarize(
     calls = [sum(s.tool_name is not None for s in t.steps) for t in trajectories]
     avg_tokens = mean(token_counts) if tokens_known else None
     attempts = [a for t in trajectories for a in t.model_attempts]
+    # 模型请求可能失败且没有文本。格式率以实际输出为分母，调用成本仍包括所有尝试。
     outputs = [a for a in attempts if a.get("raw_output") is not None]
     telemetry = [a.get("telemetry", {}) for a in attempts]
     measured = [m for m in telemetry if m.get("generation_latency_s", 0) > 0]
@@ -135,6 +143,7 @@ def summarize(
     }
 
 
+# 将同一 Policy 接到任务/数据库上，逐项运行与独立评分；确定性 fixture 会明确标记来源。
 def evaluate(
     policy: Policy, tasks: list[BenchmarkTask], database: Path, settings: Settings, output: Path
 ) -> dict:
@@ -231,6 +240,7 @@ def evaluate(
     return write_report()
 
 
+# 比较前核对两份报告的数据、设置及来源边界；不能把 CPU fixture 和真实 LLM 成绩混用。
 def compare_reports(reports: list[dict]) -> dict:
     if len(reports) < 2:
         raise ValueError("comparison_requires_two_reports")

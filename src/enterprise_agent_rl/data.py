@@ -1,5 +1,9 @@
 """Deterministic synthetic business data. No oracle tables are stored in the DB."""
 
+# 项目自建的五表合成业务数据和完整任务定义，不是公开跨企业数据库基准。
+# BenchmarkTask 同时含公开问题与私有评分信息；传给业务 Policy 时必须只取 public。
+# 业务字典可被模型查询，解释状态值、收入单位和关联；参考 SQL 不存成数据库里的答案表。
+
 from __future__ import annotations
 
 import random
@@ -21,6 +25,8 @@ DICTIONARY = {
 }
 
 
+# 评分侧任务对象。reference_sql 生成期望结果，required_* 描述必要步骤。
+# 这些字段不能直接序列化后塞进模型请求；模型入口接受的是 PublicTask。
 class BenchmarkTask(Contract):
     public: PublicTask
     split: str
@@ -32,6 +38,8 @@ class BenchmarkTask(Contract):
     required_sql_error: bool = False
 
 
+# 使用固定 seed 生成业务数据，并以独占创建拒绝覆盖已有库。
+# 金额使用整数分，避免当前示例任务引入不必要的浮点比较差异。
 def initialize_database(path: Path, seed: int = 17) -> Path:
     """Create once; refuse to overwrite existing data."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -91,6 +99,7 @@ def initialize_database(path: Path, seed: int = 17) -> Path:
     return path
 
 
+# 早期 CPU MVP 的有限模板任务；较完整的分 split benchmark 在 benchmark.py 构建。
 def benchmark_tasks() -> list[BenchmarkTask]:
     tasks = []
     for year, split in [(2024, "train"), (2025, "test")]:

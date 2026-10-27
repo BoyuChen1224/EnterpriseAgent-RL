@@ -1,5 +1,9 @@
 """M2A synthetic benchmark: manifest is verifier-side, never policy input."""
 
+# 构造可重复的合成 train/validation/test 实例，并用独立 Python 计算复核 SQL 标签。
+# 不同 split 按实例、年份和实体区分，但共享表结构与部分模板，不能据此宣称跨 Schema 泛化。
+# 这里定义/生成完整基准；运行既有训练和评测时应读取冻结输入，不为追求正数重新生成任务。
+
 from __future__ import annotations
 
 import hashlib
@@ -17,12 +21,14 @@ VERSION = "m2a-synthetic-v1"
 SPLITS = {"train": (2021, 101), "validation": (2023, 201), "test": (2025, 301)}
 
 
+# 对规范化 JSON 计算哈希，避免字典键顺序或空白不同导致同一逻辑对象指纹不同。
 def canonical_hash(value) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, ensure_ascii=False).encode()
     ).hexdigest()
 
 
+# 逻辑指纹覆盖规范化表结构和行内容，与 trajectories.py 的文件字节 SHA-256 区分。
 def database_content_fingerprint(path: Path) -> str:
     """Stable across SQLite builds; trajectories separately retain physical file hashes."""
     with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as db:
@@ -38,6 +44,7 @@ def database_content_fingerprint(path: Path) -> str:
     return canonical_hash({"schema": schema, "tables": rows})
 
 
+# 按 split 和 instance 确定数据实例；生成动作会写库，不是只读的状态核对操作。
 def create_instance(path: Path, split: str, instance: int) -> None:
     year, seed = SPLITS[split]
     initialize_database(path, seed + instance)
@@ -49,6 +56,7 @@ def create_instance(path: Path, split: str, instance: int) -> None:
         db.execute("VACUUM")
 
 
+# 列出公开问题、参考 SQL 和业务步骤约束。参考部分供离线标签构建与评分使用。
 def task_specs(split: str, instance: int) -> list[tuple[str, str, str, dict]]:
     year, _ = SPLITS[split]
     prefix = f"{split}-{instance}-"
@@ -197,6 +205,8 @@ def task_specs(split: str, instance: int) -> list[tuple[str, str, str, dict]]:
     return specs
 
 
+# 用 Python 业务计算给 SQL 标签做第二份检查，降低参考 SQL 本身写错的风险。
+# 这是离线 oracle，不是提供给业务模型的工具。
 def python_oracle(database: Path, template: str, split: str, instance: int) -> list[list]:
     """Independent relational calculation, without reference SQL or SQL aggregation."""
     with sqlite3.connect(database) as db:
@@ -274,6 +284,7 @@ def python_oracle(database: Path, template: str, split: str, instance: int) -> l
     return sorted([[k, v] for k, v in values.items()])
 
 
+# 生成数据库后逐题核对 SQL 与 Python 结果，再冻结任务、数据库和期望结果的指纹。
 def build_manifest(directory: Path) -> dict:
     """Create reproducible DBs, validate every label against a Python oracle."""
     directory.mkdir(parents=True, exist_ok=True)
@@ -340,6 +351,8 @@ def build_manifest(directory: Path) -> dict:
     return manifest
 
 
+# 完整基准装载器会校验各实例。train-only 数据构建应使用 sft_data.load_train_source，
+# 不要误用此完整装载器去打开未获准的 validation/test 数据库。
 def load_frozen_manifest(path: Path, database_root: Path) -> dict:
     manifest = json.loads(path.read_text())
     declared = manifest.pop("manifest_sha256")
