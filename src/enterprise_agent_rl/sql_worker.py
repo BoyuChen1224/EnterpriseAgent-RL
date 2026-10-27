@@ -1,5 +1,9 @@
 """Single-query subprocess: stdlib only; invoked by SQLTool, never accepts file SQL."""
 
+# 单次查询的隔离执行器，仅依赖 Python 标准库，可直接作为子进程启动。
+# 防护分为三层：操作系统资源限制、SQLite 只读/authorizer、结果行数与字节数限制。
+# 这是一套受限 SQLite 执行环境，不能把它等同于完整的容器或跨租户安全沙箱。
+
 from __future__ import annotations
 
 import json
@@ -32,8 +36,11 @@ FUNCTIONS = {
 }
 
 
+# 输入来自 SQLTool 的 JSON 请求，输出 ok/columns/rows 或可诊断的 error。
+# schema 是固定表集合的内部操作；用户 SQL 不能借此自由执行任意 PRAGMA。
 def execute(request: dict) -> dict:
     memory = request["memory_mb"] * 1024 * 1024
+    # 限制子进程地址空间、CPU 和文件写入大小。父进程还会独立控制墙钟时间。
     resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
     cpu = math.ceil(request["timeout_s"]) + 1
     resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
@@ -45,6 +52,7 @@ def execute(request: dict) -> dict:
     if operation == "sql" and (not isinstance(sql, str) or not sql.strip() or len(sql) > 16000):
         return {"ok": False, "error": "invalid_sql_length"}
     deadline = time.monotonic() + request["timeout_s"]
+    # 使用 mode=ro 打开库；后续 query_only 与 authorizer 再收紧执行权限。
     db = sqlite3.connect(
         Path(request["database"]).resolve().as_uri() + "?mode=ro", timeout=0.1, uri=True
     )
@@ -61,6 +69,8 @@ def execute(request: dict) -> dict:
         db.setlimit(sqlite3.SQLITE_LIMIT_COMPOUND_SELECT, 10)
 
         db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 500)
+        # Schema 工具仅读取项目固定表的字段和外键。
+        # 普通 SQL 的 authorizer 不开放 sqlite_master 扫描。
         if operation == "schema":
             schema = {
                 table: {
@@ -77,6 +87,8 @@ def execute(request: dict) -> dict:
             }
             return {"ok": True, "schema": schema}
 
+        # 按 SQLite 实际解析出的操作授权，而不是靠 SQL 是否以 SELECT 开头来猜安全性。
+        # 只允许主库的白名单业务表及函数，其他操作默认拒绝，包括写入与 ATTACH。
         def authorize(code, arg1, arg2, database, source):
             if code in (sqlite3.SQLITE_SELECT, sqlite3.SQLITE_RECURSIVE):
                 return sqlite3.SQLITE_OK
@@ -92,12 +104,14 @@ def execute(request: dict) -> dict:
 
         db.set_authorizer(authorize)
         db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 500)
+        # execute 只接受单条语句；模型给出多语句时由 SQLite 拒绝，不替它拆开执行。
         cursor = db.execute(sql)
         if cursor.description is None:
             return {"ok": False, "error": "query_has_no_result"}
         columns = [col[0] for col in cursor.description]
         if len(set(columns)) != len(columns):
             return {"ok": False, "error": "duplicate_columns_require_aliases"}
+        # 多取一行是为了检测截断。返回前再检查总字节，避免少量巨大字段绕过行数限制。
         rows = cursor.fetchmany(request["max_rows"] + 1)
         result = {
             "ok": True,

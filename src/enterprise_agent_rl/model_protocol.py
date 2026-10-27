@@ -1,5 +1,9 @@
 """Bounded syntactic normalization; never invent actions or SQL."""
 
+# 模型输出协议与 chat template 的集中入口，不处理业务执行。
+# 先由 parse_action 验证 JSON/参数，再交给环境校验证据 ID、预算等有状态条件。
+# 格式容错和业务纠错必须分开：移除完整代码围栏可以，改写模型的 SQL 不可以。
+
 from __future__ import annotations
 
 import json
@@ -11,6 +15,7 @@ from pydantic import Field, ValidationError
 from enterprise_agent_rl.common import Action, Contract
 
 
+# 固定生成和格式重试设置。temperature=0 的冻结评测与随机 rollout 使用不同配置。
 class GenerationSettings(Contract):
     temperature: float = Field(default=0, ge=0, le=2)
     top_p: float = Field(default=1, gt=0, le=1)
@@ -24,6 +29,8 @@ class GenerationSettings(Contract):
     enable_thinking: bool | None = None
 
 
+# 统一 SFT 与推理的消息渲染。enable_thinking=None 保留旧 Qwen2.5 行为；
+# 显式 False 交给支持该参数的官方模板处理，不用追加字符串冒充硬关闭。
 def render_chat_template(
     tokenizer,
     messages: list[dict[str, str]],
@@ -54,12 +61,15 @@ def render_chat_template(
         raise
 
 
+# 失败携带已发生的物理尝试，便于保留成本、原始输出及失败类型。
 class ModelFailure(RuntimeError):
     def __init__(self, code: str, attempts: list[dict]):
         super().__init__(code)
         self.code, self.attempts = code, attempts
 
 
+# 返回 (Action, 是否去掉完整 JSON 围栏)。只接受一份完整 JSON，不从杂乱文本中猜答案。
+# 未知键、缺参数、空 SQL 和不合法 evidence_step 都在交给工具前拒绝。
 def parse_action(content: str, mode: str = "json_fence") -> tuple[Action, bool]:
     if not content.strip():
         raise ValueError("empty_output")
