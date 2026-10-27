@@ -1,5 +1,9 @@
 """Frozen N/RL evaluation using the same injected engine/worker boundary."""
 
+# GRPO 训练后的冻结比较入口；区别于 rollout 探索，它使用一致设置评测指定模型臂。
+# 先区分已评分业务失败与技术 unknown，再用固定计划分母比较成功数和成功率。
+# 普通运行路径在 frozen_evaluation.py；本文件保留旧接口兼容，阅读时注意分支选择。
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,6 +15,7 @@ from .frozen_evaluation import evaluate_frozen as _strict_evaluate_frozen
 from .io import append_jsonl, atomic_write_json, canonical_hash, read_json, read_jsonl
 
 
+# 保留历史路径，不能仅凭旧函数名把输出当成当前正式冻结评测口径。
 def _legacy_evaluate_frozen(
     *,
     run_dir: Path,
@@ -162,6 +167,7 @@ def _legacy_evaluate_frozen(
     return result
 
 
+# 选择正式冻结评测实现或兼容分支；模型加载、记录与评分的详细流程继续到对应实现。
 def evaluate_frozen(*args, **kwargs):
     """Public frozen evaluator; the strict implementation is shared by CLI/tests."""
 

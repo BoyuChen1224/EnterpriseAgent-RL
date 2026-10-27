@@ -1,5 +1,9 @@
 """Persistent allocated-GPU wall-clock budget and child-process guard."""
 
+# 训练/评测运行的持久预算守卫：按进程内单调时间×GPU 数量累计，并独立限制调用次数。
+# 此计时从 start_job 开始，不等于 Slurm 全部 allocation；最终资源报告应核对调度侧来源。
+# 接入本守卫的 run 可跨尝试累计；不能据此宣称所有服务入口都已实现跨 Job 自动预算。
+
 from __future__ import annotations
 
 import contextlib
@@ -80,6 +84,7 @@ def _finite_nonnegative(value: Any, label: str) -> float:
     return result
 
 
+# 同一 run 使用同一份状态文件，通过文件锁和原子写入维护累计 GPU 秒与调用账本。
 class BudgetGuard:
     """Single-run accounting shared by every stage of the online loop.
 
@@ -228,6 +233,8 @@ class BudgetGuard:
         state.setdefault("events", []).append(event)
         atomic_write_json(self.state_path, state)
 
+    # 将上次核算后的时间差乘实际配置卡数，累计到当前尝试和整个 run。
+    # 排队未开始不在此计时中，失败后已花的时间也不会自动清零。
     def _accrue(self, state: dict[str, Any], *, phase: str) -> float:
         active = state.get("active_attempt")
         if active is None:
@@ -267,6 +274,7 @@ class BudgetGuard:
             phase=phase,
         )
 
+    # 有未收尾的旧尝试时拒绝直接重开，要求先核实并恢复中断账本。
     def start_job(
         self, *, job_id: str | None = None, attempt_id: str | None = None
     ) -> BudgetSnapshot:
@@ -298,6 +306,7 @@ class BudgetGuard:
             atomic_write_json(self.state_path, state)
             return snapshot
 
+    # 按显式恢复信息处理被中断的尝试，不把未知历史用量默认为零。
     def recover_interrupted(self, *, elapsed_gpu_seconds: float, reason: str) -> BudgetSnapshot:
         """Close an open attempt only with an explicit external elapsed record."""
 
@@ -381,6 +390,7 @@ class BudgetGuard:
             atomic_write_json(self.state_path, state)
             return snapshot
 
+    # 每次实际操作按名称累计并检查上限；model、worker、Verifier SQL 和 backward 分开计数。
     def record_call(self, name: str, count: int = 1) -> int:
         """Persist a physical call counter and enforce its configured ceiling."""
 
@@ -429,6 +439,7 @@ class BudgetGuard:
             )
             atomic_write_json(self.state_path, state)
 
+    # 给耗时函数加 watchdog；具体子进程操作还需配合进程组回收，不能只靠循环间检查。
     @contextlib.contextmanager
     def supervise(self, phase: str):
         """Guard a synchronous production call with a real process deadline.
@@ -473,6 +484,7 @@ class BudgetGuard:
         self.check(f"{phase}:complete", allow_soft=True)
         return result
 
+    # 监督子进程并在截止/信号时收回进程组，给日志和状态收尾保留预算。
     def run_subprocess(
         self,
         command: Sequence[str],

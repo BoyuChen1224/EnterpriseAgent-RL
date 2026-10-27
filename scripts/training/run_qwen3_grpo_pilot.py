@@ -8,6 +8,10 @@ SFT/RL validation comparison.  Every GPU stage is Slurm-only and writes its
 own evidence before returning.
 """
 
+# Qwen3 固定 batch 两次 GRPO 更新、独立重载与冻结 SFT/RL 比较的分阶段入口。
+# prepare/tiny/train/reload/compare/finalize 对应不同产物；不要把任一技术阶段通过当作业务收益。
+# 训练数据与 old logprob 来自冻结 rollout；本脚本更新阶段不重新采样或挑选验证集答案。
+
 from __future__ import annotations
 
 import argparse
@@ -318,6 +322,7 @@ def _initial_ledger(run_dir: Path) -> None:
         )
 
 
+# 校验 parent 与冻结来源，构造全量训练 batch 和计划；核心字段约束在 grpo/qwen3_update.py。
 def _prepare(repo: Path, run_dir: Path, config_path: Path) -> dict[str, Any]:
     _ensure_run_dir(run_dir)
     config, context = _config(repo, run_dir, config_path)
@@ -421,6 +426,7 @@ def _run_logged(
     return int(completed.returncode)
 
 
+# 用随机 CPU 小模型检查数学损失、LoRA 更新与状态，不代表真实 8B 运行结果。
 def _tiny(repo: Path, run_dir: Path, config_path: Path) -> dict[str, Any]:
     _ensure_run_dir(run_dir)
     batch = _read_jsonl(run_dir / "training" / "inputs" / "train-batch.jsonl")
@@ -526,6 +532,7 @@ def _resume_checkpoint_if_available(
     return recovered
 
 
+# 从 SFT parent 上训练新 delta，执行固定成功更新数并保存恢复状态与失败尝试。
 def _train(
     repo: Path,
     run_dir: Path,
@@ -684,6 +691,7 @@ def _train(
                 raise
 
 
+# fresh Base → SFT parent → final delta，核对合并次数、父依赖和有限 forward。
 def _reload(
     repo: Path,
     run_dir: Path,
@@ -867,6 +875,7 @@ def _stop_server(process: subprocess.Popen[Any]) -> None:
         process.wait(timeout=10)
 
 
+# 新起模型服务跑一臂完整冻结任务，保留每个请求/响应与正式评分，不重试业务失败追分。
 def _run_evaluation_arm(
     repo: Path,
     run_dir: Path,
@@ -971,6 +980,7 @@ def _run_evaluation_arm(
     return metrics
 
 
+# 按固定任务逐对比较，报告共同成功、共同失败、gain/loss；只比较总成功数会漏掉行为交换。
 def _comparison(run_dir: Path, validation: dict[str, Any]) -> dict[str, Any]:
     sft = _read_json(run_dir / "evaluation" / "sft" / "metrics.json")
     rl = _read_json(run_dir / "evaluation" / "rl" / "metrics.json")
@@ -1086,6 +1096,7 @@ def _comparison(run_dir: Path, validation: dict[str, Any]) -> dict[str, Any]:
     return comparison
 
 
+# 用一致输入评测 fresh SFT 和 fresh RL；历史 SFT 分数不代替本次匹配对照。
 def _compare(repo: Path, run_dir: Path, config_path: Path) -> dict[str, Any]:
     _ensure_run_dir(run_dir)
     if not (run_dir / "training" / "reload-check.json").is_file():
@@ -1110,6 +1121,7 @@ def _compare(repo: Path, run_dir: Path, config_path: Path) -> dict[str, Any]:
     return comparison
 
 
+# 把保存的 Slurm allocation 与 wrapper/守卫时长分开记录，失败 Job 的真实占用也应累计。
 def _record_allocation(
     repo: Path,
     run_dir: Path,
@@ -1199,6 +1211,7 @@ def _artifact_manifest(run_dir: Path) -> dict[str, Any]:
     return manifest
 
 
+# 离线汇总持久化记录；缺评分或关键证据保留 unknown/null，不新增模型/SQL 调用来补漂亮数字。
 def _finalize(repo: Path, run_dir: Path, config_path: Path) -> dict[str, Any]:
     _ensure_run_dir(run_dir)
     training = _read_json(run_dir / "training" / "training-metrics.json", {}) or {}

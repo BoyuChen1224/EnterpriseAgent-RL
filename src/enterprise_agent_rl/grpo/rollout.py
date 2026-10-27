@@ -1,5 +1,9 @@
 """Task-grouped online rollout, durable token binding, and advantage building."""
 
+# 多轮在线 rollout 的编排层：按任务分组采样、保存完整 episode、独立评分，再生成训练记录。
+# 同一 episode 的多轮模型输出继承同一终局相对优势，属于较粗的轨迹级信用分配。
+# 当前 Qwen3 固定批次实验另外由 qwen3_update.py 读取已冻结 rollout，不在更新时重复采样。
+
 from __future__ import annotations
 
 import statistics
@@ -21,6 +25,7 @@ from .io import (
 )
 
 
+# 由 round/group/sample 生成可重复的 episode seed；seed 与实际物理请求偏移一起记录。
 def _seed_for(
     round_index: int,
     group_index: int,
@@ -117,6 +122,8 @@ class OnlineRollout:
         self.seed_start = seed_start
         self.group_count = group_count
 
+    # 先核对任务/策略指纹和已保存进度，再只执行缺失的 episode 与评分。
+    # 完整有效记录可复用；证据冲突或缺失不能用一条假定零分替代。
     def run_round(
         self,
         *,
@@ -136,6 +143,7 @@ class OnlineRollout:
         fingerprint = _task_fingerprint(tasks, policy_snapshot)
         marker_path = round_dir / "rollout-status.json"
         existing_marker = read_json(marker_path, {}) or {}
+        # 已完成 round 只有输入及策略身份匹配才允许复用，防止拿旧策略的采样冒充新一轮。
         if existing_marker.get("status") == "COMPLETED":
             if existing_marker.get("input_fingerprint") != fingerprint:
                 raise RuntimeError(f"completed_round_input_fingerprint_changed:{round_index}")
@@ -298,11 +306,13 @@ class OnlineRollout:
         if any(score is None for score in scores):
             raise RuntimeError(f"round_score_cardinality:{round_index}")
         score_values = [score for score in scores if score is not None]
+        # 只从已评分且有实际 reward 的记录构造优势；unknown 不伪装成业务奖励零。
         advantages_by_episode: dict[str, float] = {}
         grouped: dict[str, list[ScoreResult]] = defaultdict(list)
         for score in score_values:
             if score.status == "scored" and score.reward_value is not None:
                 grouped[score.task_id].append(score)
+        # 在同一任务内部标准化，避免把不同难度任务直接混在一起当成相对优劣。
         for group_scores in grouped.values():
             rewards = [float(score.reward_value) for score in group_scores]
             mean = statistics.mean(rewards)
@@ -323,6 +333,7 @@ class OnlineRollout:
             score = existing_scores[episode_id]
             if episode is None or score.status != "scored":
                 continue
+            # 一条 episode 可有多次物理模型请求。终局优势分配给该 episode 的所有非空生成记录。
             advantage = float(advantages_by_episode.get(episode_id, 0.0))
             for token in episode.token_records:
                 if not token.generated_token_ids:
@@ -337,6 +348,7 @@ class OnlineRollout:
                 row["verifier_record_id"] = score.verifier_record_id or episode_id
                 row["source_kind"] = score.source_kind
                 dataset_records.append(row)
+                # 完整生成 token 分母包含零优势记录；跳过它们的梯度，不代表从归一化分母删除它们。
                 total_tokens += len(token.generated_token_ids)
                 if advantage == 0.0:
                     zero += 1
@@ -395,6 +407,7 @@ class OnlineRollout:
         atomic_write_json(marker_path, result)
         return result
 
+    # 把运行轨迹保存到本 round，供资格检查、结果分析和后续回放。
     def _persist_trajectory(self, round_dir: Path, episode: EpisodeSample) -> str | None:
         trajectory = episode.metadata.get("trajectory")
         if not isinstance(trajectory, dict):

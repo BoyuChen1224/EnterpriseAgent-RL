@@ -1,5 +1,9 @@
 """Continuous optimizer/scheduler/scaler update orchestration."""
 
+# 连续训练的调度层，负责 round/逻辑 step、状态指纹、checkpoint 和持久化进度。
+# 模型前向、反向和 AMP 由 policy.update 实现；此层不重新初始化每轮的 optimizer/scheduler。
+# 逻辑更新数、物理 optimizer 尝试和 backward 次数是不同计数，不能互相顶替。
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,6 +14,7 @@ from .io import atomic_write_json, canonical_hash, read_json
 from .state import recursive_fingerprint
 
 
+# 给采样/评测绑定当前策略身份，包含轮次与已完成更新，而不只使用一个易混淆的模型名。
 def _policy_snapshot(policy: Any, *, round_index: int, successful_updates: int) -> dict[str, Any]:
     if hasattr(policy, "policy_snapshot"):
         value = policy.policy_snapshot(
@@ -74,6 +79,8 @@ class ContinuousTrainer:
         self.guard = guard
         self.policy = policy
 
+    # 核对非退化组、有效 token 和连续游标后执行一到两次逻辑更新，再保存恢复所需的记录。
+    # 调用方应在完成技术门槛后再安排业务评测，不根据业务分数临时更换 checkpoint。
     def train_round(
         self, *, round_index: int, dataset: dict[str, Any], first_step: int, updates: int = 2
     ) -> dict[str, Any]:
@@ -92,6 +99,7 @@ class ContinuousTrainer:
         state_path = self.run_dir / "training" / "state.json"
         state = read_json(state_path, {}) or {}
         completed = int(state.get("successful_updates", first_step))
+        # 跨轮从上轮结束的 step 接续，不允许把 step2 的数据挂到重新从 step0 初始化的策略上。
         if completed != first_step:
             raise RuntimeError(f"continuous_state_cursor_mismatch:{completed}:{first_step}")
         round_dir = self.run_dir / "rounds" / f"r{round_index}" / "training"
@@ -111,6 +119,7 @@ class ContinuousTrainer:
             if logical_step in prior_rows:
                 continue
             self.guard.check(f"round{round_index}:update:{logical_step}")
+            # 保存前后状态身份用于核对是否连续接续；真实梯度与参数变化检查位于具体 policy。
             before = _state_fingerprint(self.policy)
             try:
                 self.guard.record_call("optimizer_update_attempts")
@@ -144,6 +153,7 @@ class ContinuousTrainer:
                 "after_state": after,
                 "update": update,
             }
+            # 权重之外的 optimizer、scheduler、scaler、RNG 与游标必须随 checkpoint 一起恢复。
             if hasattr(self.policy, "save_checkpoint"):
                 checkpoint_metadata = {
                     "round_index": round_index,

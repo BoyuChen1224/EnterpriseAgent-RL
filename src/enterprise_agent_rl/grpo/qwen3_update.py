@@ -6,6 +6,10 @@ small, fail-closed contract for the fixed Qwen3 batch used by T-034.  It does
 not import torch and never opens validation/test payloads.
 """
 
+# Qwen3 固定批次更新契约：读取 T-033 冻结采样，构建新训练批次，不再生成新 rollout。
+# 原包中的 advantage 为 null；本模块由正式 RESULT 奖励计算优势，保持原始 token/logprob 不变。
+# 固定实验是 4 组×4 episode、118 请求、4745 生成 token，两次更新不能称为新的在线采样轮。
+
 from __future__ import annotations
 
 import hashlib
@@ -64,6 +68,7 @@ def _require_equal(values: dict[str, Any], key: str, expected: Any) -> None:
         raise ValueError(f"qwen3_update_value_mismatch:{key}")
 
 
+# 核对固定模型、LoRA、优化器、运行条件和数据来源，不根据验证成绩临时改配方。
 def validate_qwen3_update_values(values: dict[str, Any]) -> None:
     """Validate the complete fixed T-034 identity without loading torch."""
 
@@ -313,6 +318,7 @@ def _finite_sequence(values: Any, label: str) -> None:
         raise ValueError(f"qwen3_update_nonfinite_sequence:{label}")
 
 
+# 核对 token 与原始 request/response/engine 记录的关联，避免拿解码摘要冒充采样证据。
 def _verify_source_chain(source: Path, token_rows: list[dict[str, Any]]) -> dict[str, Any]:
     request_ids: set[str] = set()
     response_ids: set[str] = set()
@@ -384,6 +390,7 @@ def _verify_source_chain(source: Path, token_rows: list[dict[str, Any]]) -> dict
     }
 
 
+# 逐组检查四条正式奖励，使用样本标准差计算优势。奖励完全相同的组返回零优势。
 def _group_advantages(result_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     by_group: dict[str, list[dict[str, Any]]] = {}
     for row in result_rows:
@@ -465,6 +472,7 @@ def _verify_group_metrics(group_metrics: dict[str, Any], groups: dict[str, dict[
             raise ValueError(f"qwen3_update_group_metrics_advantage_mismatch:{group_id}")
 
 
+# 验证请求数、非零/零优势数、完整 token 分母、长度和有限 logprob，失败时不进入 GPU 更新。
 def validate_train_batch(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Validate the post-assignment batch before any model forward/backward."""
 
@@ -538,6 +546,8 @@ def validate_train_batch(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return observed
 
 
+# 在新目录复制冻结 token 字段，再按 episode RESULT 赋优势；不修改原 rollout 里的 null。
+# 失败 episode 也保留，不能只拿成功 SQL 训练或只选有利任务改写本实验。
 def build_frozen_train_batch(source_run: Path, output_path: Path) -> dict[str, Any]:
     """Copy the immutable token fields into a new run and assign episode rewards."""
 
@@ -602,6 +612,7 @@ def build_frozen_train_batch(source_run: Path, output_path: Path) -> dict[str, A
         ):
             raise ValueError(f"qwen3_update_episode_group_binding:{episode_id}")
         advantage, sample_std = episode_to_group[episode_id]
+        # 只给新副本附加优势/来源。原生 prompt/completion/old logprob/mask 必须逐项保留。
         copied = dict(row)
         copied["advantage"] = advantage
         copied["reward_value"] = float(result["reward_value"])

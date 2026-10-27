@@ -7,6 +7,10 @@ model execution, and binds the response, engine event, token record, Action
 attempt, and trajectory before a verifier is allowed to run.
 """
 
+# 记录每次物理模型调用的请求、响应和 engine 事件，供评分前检查技术资格。
+# 技术资格检查回答“是否真实、完整地运行并记录”，不回答“模型业务上是否做对”。
+# 无效 JSON、错误 SQL 等完整的业务失败应进入评分；缺响应或哈希冲突才属于技术 unknown。
+
 from __future__ import annotations
 
 import copy
@@ -87,6 +91,7 @@ class EvidenceStore:
         self.instance_id = f"engine-{uuid.uuid4().hex}"
         self.local_request_counter = 0
 
+    # 通过文件锁和独占目录分配全 run 的物理尝试号，进程重启后也不覆盖之前的尝试。
     def _allocate_attempt_index(self) -> int:
         attempts_root = self.root / "attempts"
         attempts_root.mkdir(parents=True, exist_ok=True)
@@ -104,6 +109,7 @@ class EvidenceStore:
             fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
         return index
 
+    # 先持久化实际 messages、生成设置和模型身份，再允许执行模型；失败也能留下调用起点。
     def start_attempt(
         self,
         *,
@@ -227,6 +233,8 @@ class EvidenceStore:
             "content_sha256": content_sha256,
         }
 
+    # 将响应、原生 token 与 engine 事件互相绑定，并使用不可覆盖的记录写法。
+    # 不能返回看似成功的响应，却省略用于后续评分的持久化内容。
     def persist_response(
         self,
         handle: AttemptHandle,
@@ -376,6 +384,7 @@ class EvidenceStore:
                 f"response_or_event_persist_failed:{handle.request_id}:{type(exc).__name__}:{exc}"
             ) from exc
 
+    # 持久化未完成尝试的错误和执行状态，便于区分未启动、执行中断和正常业务失败。
     def persist_incomplete(
         self,
         handle: AttemptHandle,
@@ -438,6 +447,8 @@ def _require(value: Any, label: str) -> Any:
     return value
 
 
+# Verifier 前逐项核对请求 ID、响应 ID、engine 事件、哈希和轨迹。
+# 资格不通过应报告 unknown；不能借此过滤模型的无效 Action 或 SQL 失败而提高成功率。
 def qualify_episode_evidence(
     episode: EpisodeSample,
     *,

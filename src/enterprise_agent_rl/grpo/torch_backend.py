@@ -4,6 +4,11 @@ Imports of torch/Transformers are deliberately lazy.  Configuration validation,
 finalization, and CPU fake integration therefore never load model assets.
 """
 
+# 真实 Torch 后端，是 GRPO 里最接近 GPU 的一层；配置和数据预检尽量在加载权重前完成。
+# 阅读主线：QwenPolicy._load_train_impl → HfRolloutEngine.generate → QwenPolicy.update。
+# 训练从 fresh Base 合并 SFT parent，再注入新的可训练 delta；推理按 Base→parent→delta 加载。
+# 本模块的 import 不应立即加载 Torch/权重；真实模型初始化和调用仍受已有 GPU/预算入口约束。
+
 from __future__ import annotations
 
 import contextlib
@@ -87,6 +92,7 @@ class GenerationResult:
     usage: dict[str, int]
 
 
+# 持有模型、tokenizer、optimizer/scheduler/scaler 和 parent 身份，管理更新及 checkpoint。
 class QwenPolicy:
     """Fresh base → merge frozen N once → train one LoRA delta."""
 
@@ -130,6 +136,9 @@ class QwenPolicy:
         self.amp_skip_replays_total = 0
         self.forward_backward_count = 0
 
+    # 先核对实际 parent 权重/config，再离线加载 Base 并合并 parent。
+    # 原模型冻结，只有新 delta 可训练。
+    # reentrant checkpoint 需要输入梯度以保持图连通，这不等于解冻 Base 参数。
     @classmethod
     def _load_train_impl(
         cls,
@@ -204,6 +213,7 @@ class QwenPolicy:
             trainable_lora_parameters,
         )
 
+        # 先把已验证的 SFT parent 合进 Base，再插入全新 LoRA；新训练目标是 parent 之上的增量。
         parent_merge = merge_lora_adapter(
             model,
             parent,
@@ -235,6 +245,7 @@ class QwenPolicy:
         if bool(config.optimizer.get("enable_input_require_grads", True)):
             model.enable_input_require_grads()
         model.train()
+        # 优化器仅持有 LoRA 张量，并固定非 foreach/fused 路径，便于数值与恢复行为核对。
         optimizer = torch.optim.AdamW(
             trainable,
             lr=float(config.optimizer["learning_rate"]),
@@ -266,6 +277,7 @@ class QwenPolicy:
             device=torch.device("cuda:0"),
         )
 
+    # 历史 Qwen2.5/1.5B 训练入口；Qwen3 固定 pilot 走独立的 load_qwen3_update 契约。
     @classmethod
     def load(cls, context: RunContext, config: GrpoConfig, guard: BudgetGuard) -> QwenPolicy:
         """Historical Qwen2.5/1.5B online loader; its contract stays unchanged."""
@@ -318,6 +330,7 @@ class QwenPolicy:
             expected_module_count=QWEN3_MODULE_COUNT,
         )
 
+    # 独立装载评测臂并核对模型栈，避免复用已 merge 的对象导致重复叠加权重。
     @classmethod
     def load_evaluation(
         cls,
@@ -597,8 +610,12 @@ class QwenPolicy:
         }
         return _digest_tensor_state(state)
 
+    # 使用采样时的原生 IDs 和 old logprob 构造单请求 batch，不从 action_text 重分词。
+    # completion_mask 只覆盖生成 token；包含工具反馈的 prompt 只作为注意力上下文。
     def _inputs(self, record: dict[str, Any]) -> dict[str, Any]:
         torch = _torch()
+        # 每条记录构造成 microbatch=1：prompt 是 [1,P]，completion/logprob/mask 是 [1,C]。
+        # response_mask 覆盖整段 P+C；这里 completion_mask 只覆盖 C，二者不要混用。
         prompt = torch.tensor([record["prompt_token_ids"]], dtype=torch.long, device=self.device)
         completion = torch.tensor(
             [record["generated_token_ids"]], dtype=torch.long, device=self.device
@@ -628,6 +645,8 @@ class QwenPolicy:
             ),
         }
 
+    # 一次逻辑更新可有多个请求级 backward。先保存重放前状态，再累积非零优势记录的梯度。
+    # 零优势记录跳过梯度，但 total_tokens 仍使用调用方校验过的完整 batch 分母。
     def update(
         self, records: list[dict[str, Any]], *, logical_step: int, total_tokens: int
     ) -> dict[str, Any]:
@@ -642,6 +661,7 @@ class QwenPolicy:
                 or not math.isfinite(float(advantage))
             ):
                 raise ValueError(f"advantage_invalid:{row.get('episode_id')}")
+        # 全批没有非零优势时直接返回跳过状态；没有相对信号时不凭空制造梯度。
         active = [row for row in records if float(row["advantage"]) != 0.0]
         if not active:
             return {
@@ -651,6 +671,7 @@ class QwenPolicy:
             }
         self.model.train()
         before = self._adapter_state()
+        # 更新前快照包括 optimizer/scheduler/RNG，AMP 失败不能只重置参数而留下已变化的动量。
         before_optimizer = copy.deepcopy(self.optimizer.state_dict())
         before_scheduler = copy.deepcopy(self.scheduler.state_dict())
         replay_count = 0
@@ -670,6 +691,7 @@ class QwenPolicy:
                     allow_soft=True,
                 )
                 inputs = self._inputs(row)
+                # 上下文必须覆盖 backward，保证 checkpoint 在反向重算时也使用 math attention。
                 with attention_backend_context(torch, "sdpa_math"):
                     with torch.autocast(
                         device_type=self.device.type,
@@ -682,6 +704,8 @@ class QwenPolicy:
                     mask_tokens = sum(int(value) for value in row.get("completion_mask", []))
                     if not mask_tokens:
                         mask_tokens = len(row["generated_token_ids"])
+                    # compute_loss 已按本请求的生成 token 平均。
+                    # 乘该权重后等价于对完整 batch 做 token 归一化。
                     weighted = loss * (float(mask_tokens) / float(total_tokens))
                     self.scaler.scale(weighted).backward()
                 for name, parameter in self.model.named_parameters():
@@ -711,6 +735,7 @@ class QwenPolicy:
                     self.config.optimizer["max_amp_skip_replays"]
                 ):
                     raise FloatingPointError("amp_skip_replay_limit_exceeded")
+                # AMP skip 后保留降低的 scale，其他训练状态回到本次更新前，再重放同一批记录。
                 reduced_scaler = copy.deepcopy(self.scaler.state_dict())
                 self._load_adapter_state(before)
                 self.optimizer.load_state_dict(before_optimizer)
@@ -726,6 +751,7 @@ class QwenPolicy:
             if not math.isfinite(grad_norm) or grad_norm <= 0:
                 raise FloatingPointError("successful_update_gradient_not_finite_positive")
             self.guard.record_call("successful_optimizer_updates")
+            # 只有增量真实变化且梯度有限为正，才把这次 optimizer 更新记为成功并推进 scheduler。
             self.scheduler.step()
             return {
                 "status": "UPDATED",
@@ -760,6 +786,8 @@ class QwenPolicy:
                 with _torch().no_grad():
                     target.copy_(state[key].to(device=target.device, dtype=target.dtype))
 
+    # 保存 delta、optimizer/scheduler/scaler/RNG、调用累计和 metadata。
+    # 只存 Adapter 无法等价续训。
     def save_checkpoint(
         self, run_dir: Path, *, logical_step: int, metadata: dict[str, Any]
     ) -> dict[str, Any]:
@@ -807,6 +835,7 @@ class QwenPolicy:
             "policy_fingerprint": self.policy_fingerprint(),
         }
 
+    # 恢复训练权重与优化器等状态，并核对数据指纹；不是只加载最终推理 Adapter。
     def load_run_state(self, run_dir: Path, state: dict[str, Any]) -> None:
         torch = _torch()
         step = int(state["successful_updates"])
@@ -831,6 +860,7 @@ class QwenPolicy:
         self.forward_backward_count = int(value.get("forward_backward_count", 0))
         self.model.train()
 
+    # 保存最终 delta 和父依赖加载顺序。该 delta 不能 standalone 加到原始 Base 上。
     def freeze_final(self, run_dir: Path, *, snapshot: dict[str, Any]) -> dict[str, Any]:
         from enterprise_agent_rl.lora import save_adapter
 
@@ -899,6 +929,7 @@ class QwenPolicy:
                 torch.cuda.empty_cache()
 
 
+# 把 Agent 多轮决策连接到同一策略实例，采集真实 token、概率和不可覆盖的请求/响应记录。
 class HfRolloutEngine:
     """Direct model-facing engine; Runtime and Reward remain public interfaces."""
 
@@ -1010,6 +1041,8 @@ class HfRolloutEngine:
             episode_id=episode_id,
         )
 
+    # 一次物理生成先登记请求，再执行模型并保存响应。失败也保留原始尝试与技术状态。
+    # 原始 logits 与采样处理后的 scores 分别转 logprob；二者含义不同，不可只保存一个再猜另一个。
     def generate(
         self,
         *,
@@ -1159,9 +1192,12 @@ class HfRolloutEngine:
             scores = tuple(getattr(generated, "scores", ()) or ())
             if len(raw_logits) != len(scores):
                 raise RuntimeError("raw_behavior_step_count_mismatch")
+            # 生成部分直接从模型返回序列切出，与逐步 logits 数量对齐，不从解码字符串重建 token。
             generated_ids = full_ids[len(prompt_ids) : len(prompt_ids) + len(raw_logits)]
             if len(generated_ids) != len(raw_logits):
                 raise RuntimeError("generated_token_step_count_mismatch")
+            # raw 是原始策略概率，behavior 是 temperature/top-p 等处理后的采样概率。
+            # 两者同时保存便于核对。
             raw_log_probs: list[float] = []
             behavior_log_probs: list[float] = []
             for index, token_id in enumerate(generated_ids):
@@ -1335,6 +1371,7 @@ class _DirectPolicy:
         self.records: list[TokenRecord] = []
         self.failed_action: dict[str, Any] | None = None
 
+    # 在 Agent 决策接口中直接调用 engine，保留解析失败、格式重试及对应的全部物理请求。
     def decide(
         self, task: PublicTask, observation: Any, history: list[Any], timeout_s: float
     ) -> Decision:
@@ -1434,6 +1471,8 @@ class RealVerifierWorker:
         self.verifier = verifier
         self.guard = guard
 
+    # 将已保存轨迹交给业务 Verifier；调用方须先完成 qualify_episode_evidence 技术检查。
+    # 普通 SQL/Action 失败仍正常评分，不能借技术资格筛选失败答案。
     def score(self, task: TaskInput, episode: EpisodeSample) -> ScoreResult:
         trajectory_value = episode.metadata.get("trajectory")
         if not isinstance(trajectory_value, dict):

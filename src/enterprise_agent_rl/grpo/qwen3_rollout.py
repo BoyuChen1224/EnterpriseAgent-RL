@@ -7,6 +7,10 @@ loads a model without constructing any optimizer, scaler, scheduler, or
 trainable delta.
 """
 
+# Qwen3-8B 的独立 rollout-only 装载与配置门槛，不能路由到旧 1.5B 训练配置。
+# 它只加载 Base+SFT parent 并冻结参数，不创建用于 GRPO 更新的可训练 delta。
+# 后续更新能否进行，要看同任务采样是否有奖励差异以及 token/请求记录是否完整。
+
 from __future__ import annotations
 
 import hashlib
@@ -78,6 +82,7 @@ def _resolved_path(value: str, context: RunContext) -> Path:
     return path if path.is_absolute() else context.repo_root / path
 
 
+# 固定 revision、FP16/math、thinking-off、每组采样及预算等实验条件，拒绝静默漂移。
 def validate_qwen3_rollout_values(values: dict[str, Any]) -> None:
     """Fail closed on every experiment-defining value."""
 
@@ -230,6 +235,7 @@ def load_qwen3_rollout_config(
     )
 
 
+# 权重和 adapter_config 都要校验，不能用目录名或一个旧报告中的 SHA 代替实际资产。
 def _adapter_identity(adapter_dir: Path, config: GrpoConfig) -> dict[str, Any]:
     weight_path = adapter_dir / "adapter_model.safetensors"
     config_path = adapter_dir / "adapter_config.json"
@@ -277,6 +283,7 @@ def _adapter_identity(adapter_dir: Path, config: GrpoConfig) -> dict[str, Any]:
     }
 
 
+# 以实际 chat template 检查渲染和上下文余量，不加载模型做业务推理。
 def _tokenizer_preflight(tokenizer: Any, context: RunContext, config: GrpoConfig) -> dict[str, Any]:
     template = getattr(tokenizer, "chat_template", None)
     if not isinstance(template, str) or not template:
@@ -318,6 +325,7 @@ def _tokenizer_preflight(tokenizer: Any, context: RunContext, config: GrpoConfig
     return result
 
 
+# 加载并合并固定 SFT parent，核对模块数量并冻结所有参数；此路径没有训练更新。
 def load_qwen3_rollout_policy(context: RunContext, config: GrpoConfig, guard: Any) -> QwenPolicy:
     """Fresh Qwen3 base + one frozen SFT merge; no train state is touched."""
 
@@ -432,6 +440,7 @@ def load_qwen3_rollout_policy(context: RunContext, config: GrpoConfig, guard: An
     return policy
 
 
+# 保存用于绑定 rollout 的实际模型/parent/模板身份，后续批次必须与该快照对应。
 def qwen3_policy_snapshot(config: GrpoConfig, policy: QwenPolicy) -> dict[str, Any]:
     """Stable identity supplied to every physical model request."""
 

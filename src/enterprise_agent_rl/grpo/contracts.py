@@ -1,5 +1,9 @@
 """Serializable contracts between rollout, worker, and update components."""
 
+# GRPO 各模块交换的对象：TaskInput → EpisodeSample(TokenRecord) → ScoreResult → update。
+# episode 是一次完整业务任务；TokenRecord 是其中一次真实模型请求，不是一个独立任务。
+# 原生 token 与 logprob 必须一一对应，不能从解码文本重分词后伪造采样记录。
+
 from __future__ import annotations
 
 import math
@@ -15,6 +19,7 @@ def _as_float_list(values: list[Any], label: str) -> list[float]:
     return result
 
 
+# 同一任务组的公开输入及执行位置。verifier_payload 仅供评分 worker，不能进入模型 messages。
 @dataclass
 class TaskInput:
     task_id: str
@@ -25,6 +30,8 @@ class TaskInput:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+# 保存 prompt/completion token、两种 logprob 和请求身份。
+# raw_policy_log_probs 对应模型原分布，behavior_sampling_log_probs 对应采样处理后的分布。
 @dataclass
 class TokenRecord:
     episode_id: str
@@ -52,6 +59,7 @@ class TokenRecord:
     def new_id(cls) -> str:
         return str(uuid.uuid4())
 
+    # 检查长度、有限 logprob 及完整 response_mask：prompt 为 0，实际生成部分为 1。
     def validate(self) -> None:
         if len(self.generated_token_ids) != len(self.raw_policy_log_probs):
             raise ValueError(
@@ -71,6 +79,8 @@ class TokenRecord:
         _as_float_list(self.raw_policy_log_probs, "raw_log_probs")
         _as_float_list(self.behavior_sampling_log_probs, "behavior_log_probs")
 
+    # 训练侧 old_per_token_logps 使用原始策略 logprob；completion_mask 仅覆盖生成部分。
+    # 记录里保留原生结束 token，不能为提高格式通过率事后删 token 后继续沿用原概率。
     def to_dict(self) -> dict[str, Any]:
         self.validate()
         return {
@@ -131,6 +141,7 @@ class TokenRecord:
         )
 
 
+# 把同一 episode 的多轮请求与策略快照关联起来，保留失败动作而不只筛成功输出。
 @dataclass
 class EpisodeSample:
     episode_id: str
@@ -186,6 +197,8 @@ class EpisodeSample:
         )
 
 
+# status=scored 才有可比较的业务奖励；status=unknown 表示技术上无法得出结论。
+# 合法记录的业务失败是 scored/success=False，不能因为失败就剔除。
 @dataclass
 class ScoreResult:
     episode_id: str

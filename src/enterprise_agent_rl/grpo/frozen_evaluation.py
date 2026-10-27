@@ -1,5 +1,9 @@
 """Frozen evaluation through the shared engine, verifier, and evidence guard."""
 
+# 正式冻结评测：每个计划任务都保留一个结果槽位，模型臂必须使用同一批公开任务和数据库。
+# 完整的 SQL/Action 业务失败进入固定分母；缺模型响应或缺评分记录等技术问题保留 unknown。
+# 比较必须等两臂计划项都完成评分；不能缩分母或把缺失项填成业务零分。
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,6 +28,7 @@ def _error_value(exc: Exception) -> dict[str, str]:
     return {"type": type(exc).__name__, "message": str(exc)[:1000]}
 
 
+# 构造技术未评分结果：success 不能被解读为已证实的业务失败，错误原因要单独保留。
 def _technical_unknown(
     *,
     task: TaskInput,
@@ -53,6 +58,7 @@ def _technical_unknown(
     return row
 
 
+# 绑定公开任务、数据库与元数据，防止同名 task_id 实际指向不同输入。
 def _task_fingerprint(tasks: list[TaskInput]) -> str:
     return canonical_hash(
         [
@@ -68,6 +74,8 @@ def _task_fingerprint(tasks: list[TaskInput]) -> str:
     )
 
 
+# 按冻结任务计划运行指定模型臂，保存轨迹后校验真实模型证据，再调用业务评分。
+# 复用已有记录时仍检查来源；不因为答案错误就换 seed、重跑或换 checkpoint。
 def evaluate_frozen(
     *,
     run_dir: Path,

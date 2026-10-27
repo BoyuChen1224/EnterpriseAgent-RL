@@ -14,6 +14,10 @@ Stages are deliberately separate:
   reference advantages.  It does not call a model, SQL worker, or verifier.
 """
 
+# Qwen3 分组 rollout 的执行入口：固定 train 面板 → 随机多轮采样 → 正式评分 → token 契约检查。
+# 这里只采样，不进行 backward/optimizer 更新；后续有限训练入口是 run_qwen3_grpo_pilot.py。
+# 原始失败和格式重试都要保存，不能只留下成功轨迹来构造看似有利的奖励分布。
+
 from __future__ import annotations
 
 import argparse
@@ -319,6 +323,7 @@ def _copy_frozen_databases(
     return entries
 
 
+# 按固定 train task 选择输入和数据库，并建立受控 SQL 检查；不是读取 validation 答案挑题。
 def _build_panel(
     paths: dict[str, Path], panel: dict[str, Any], config: Any
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -472,6 +477,7 @@ def _control_counts(run_dir: Path) -> dict[str, int]:
     }
 
 
+# 读取已有冻结面板进行重复核对，避免重复 preflight 时再次执行相同 CPU SQL 控制。
 def _load_frozen_panel(
     paths: dict[str, Path], panel: dict[str, Any]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]] | None:
@@ -717,6 +723,7 @@ def _record_command(
     _write_json(path, {"schema_version": "t033-commands-v1", "commands": rows})
 
 
+# 检查资产、分组计划和 tokenizer，准备 train-only 运行输入；不在此阶段调用真实模型。
 def _prepare(paths: dict[str, Path]) -> dict[str, Any]:
     _ensure_run_dir(paths["run"])
     panel = json.loads(paths["panel_manifest"].read_text(encoding="utf-8"))
@@ -1035,6 +1042,7 @@ def _score_row(
     return row
 
 
+# 逐 episode 执行真实 Agent 与独立评分，关联全部物理请求和终局 RESULT。
 def _run_schedule(
     paths: dict[str, Path],
     config: Any,
@@ -1267,6 +1275,7 @@ def _update_job_chain(
     _write_json(paths["run"] / "job-chain.json", chain)
 
 
+# 在计算节点加载冻结 SFT 策略并执行采样计划，按累计 GPU 与调用预算收口。
 def _rollout(paths: dict[str, Path], args: argparse.Namespace) -> dict[str, Any]:
     if not os.environ.get("SLURM_JOB_ID"):
         raise RolloutSignalError("real_qwen3_rollout_requires_slurm_job")
@@ -1354,6 +1363,7 @@ def _finite(values: list[Any]) -> bool:
     return all(math.isfinite(float(value)) for value in values)
 
 
+# 核对 prompt/completion、EOS、mask、有限 logprob 与 request/event 身份，而不是只统计回答条数。
 def _validate_tokens(
     paths: dict[str, Path], episodes: dict[str, dict[str, Any]], tokens: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -1439,6 +1449,7 @@ def _read_slurm_root_evidence(paths: dict[str, Path]) -> dict[str, Any]:
     return {"files": candidates, "rows": rows, "root_rows": root_rows}
 
 
+# 按同一 task 的四次奖励统计均值和总体方差；训练优势另用样本标准差。
 def _group_metrics(
     schedule: list[dict[str, Any]], scores: dict[str, dict[str, Any]]
 ) -> dict[str, Any]:
@@ -1567,6 +1578,7 @@ def _write_artifact_manifest(run_dir: Path) -> dict[str, Any]:
     return manifest
 
 
+# 汇总已有运行证据与指标，不把缺失 episode 当成零奖励，也不自动追加采样。
 def _finalize(paths: dict[str, Path]) -> dict[str, Any]:
     preflight = read_json(paths["run"] / "preflight.json")
     if not isinstance(preflight, dict) or preflight.get("status") != "PASSED":

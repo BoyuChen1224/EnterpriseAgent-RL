@@ -1,5 +1,9 @@
 """Exact, recursive state and RNG helpers for resumable GRPO runs."""
 
+# 训练恢复的状态比较与 RNG 工具。比较参数数量或 optimizer 条目数不足以证明状态相同。
+# recursive_fingerprint/recursive_equal 递归处理张量、容器和标量，检查的是实际内容。
+# 仅恢复 seed 不能替代恢复训练到一半的 RNG 状态、优化器动量和数据游标。
+
 from __future__ import annotations
 
 import hashlib
@@ -82,12 +86,14 @@ def _update_digest(digest: Any, value: Any) -> None:
     raise TypeError(f"unsupported_state_value:{type(value).__name__}")
 
 
+# 给完整嵌套状态生成内容指纹，供 optimizer/scheduler/scaler/冻结参数等恢复前后核对。
 def recursive_fingerprint(value: Any) -> str:
     digest = hashlib.sha256()
     _update_digest(digest, value)
     return digest.hexdigest()
 
 
+# 按结构和内容递归比较，不仅比较 tensor shape 或 state_count。
 def recursive_equal(left: Any, right: Any) -> bool:
     """Compare every nested tensor/array/scalar value exactly."""
 
@@ -128,6 +134,7 @@ def recursive_equal(left: Any, right: Any) -> bool:
     return left == right
 
 
+# 保存 Python、可用 NumPy、Torch CPU 和所有可用 CUDA 的随机状态，不在模块导入时强制加载它们。
 def capture_rng_state() -> dict[str, Any]:
     state: dict[str, Any] = {"python": random.getstate()}
     try:
@@ -147,6 +154,7 @@ def capture_rng_state() -> dict[str, Any]:
     return state
 
 
+# 恢复已保存的具体 RNG 位置；只有 CUDA 状态存在且设备可用时才恢复设备 RNG。
 def restore_rng_state(state: Mapping[str, Any]) -> None:
     random.setstate(state["python"])
     numpy_state = state.get("numpy")
